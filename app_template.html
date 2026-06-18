@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APDS · PM Estudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --paper:#F4F1EC; --paper2:#EDE8E0; --surface:#FFF;
+  --ink:#1A1410; --ink2:#5C5248; --ink3:#9C9088; --line:#DDD6CC;
+  --burg:#3C1F21; --burg2:#5A3134; --burg3:#7A4548;
+  --cop:#C26942; --cop2:#D4845A; --cop3:rgba(194,105,66,.15);
+  --viv:#3D6491; --viv-t:#E4ECF5;
+  --hot:#436B3A; --hot-t:#E3EDE0;
+  --rest:#B35D30; --rest-t:#F5E4D8;
+  --crit:#A82E2E; --crit-t:#F4DEDE;
+  --alto:#B86328; --alto-t:#F4E4D6;
+  --med:#967A1E; --med-t:#F0EAD2;
+  --baj:#4E7A42; --baj-t:#DFF0D8;
+  --vac:#7A736B; --vac-t:#EDEAE5;
+  --ph1:#8A96BB; --ph2:#C0825A; --ph3:#C8A84E;
+  --ph4:#6A9E90; --ph5:#7AA4CC; --ph6:#72A86C;
+  --ph7:#B87EA8; --ph8:#B84040; --ph9:#C4BDB4;
+  --r:3px; --f:'Inter','Helvetica Neue',Arial,sans-serif;
+}
+html,body{background:var(--paper);color:var(--ink);font-family:var(--f);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+
+/* ── TOP BAR ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:var(--burg);gap:16px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:16px;}
+.brand-name{font-size:12px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--cop);line-height:1.4;}
+.brand-name span{display:block;}
+.brand-div{width:1px;height:28px;background:var(--burg3);}
+.brand-sub{font-size:10.5px;font-weight:300;letter-spacing:.12em;text-transform:uppercase;color:rgba(194,105,66,.6);}
+.week-badge{font-size:10px;font-weight:400;letter-spacing:.1em;text-transform:uppercase;color:var(--cop);border:1px solid var(--burg3);padding:5px 12px;border-radius:2px;}
+.update-badge{font-size:10px;color:rgba(194,105,66,.5);letter-spacing:.06em;}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:0;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--line);padding:0 20px;flex-wrap:nowrap;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;padding:12px 18px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--ink3);cursor:pointer;white-space:nowrap;transition:.15s;margin-bottom:-1px;}
+.tab:hover{color:var(--ink);border-bottom-color:var(--line);}
+.tab.active{color:var(--burg);border-bottom-color:var(--cop);font-weight:500;}
+.tab.tab-master{color:var(--cop2);}
+.tab.tab-master.active{color:var(--burg);}
+
+/* ── LAYOUT ── */
+.app{max-width:1020px;margin:0 auto;padding:0 20px 80px;}
+.view-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+.view-title{font-size:22px;font-weight:300;letter-spacing:.06em;text-transform:uppercase;color:var(--burg);}
+.view-sub{font-size:11px;font-weight:300;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-top:5px;}
+.view-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+
+/* ── PANELS ── */
+.panel{margin-bottom:24px;}
+.panel-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.eyebrow{font-size:10.5px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);}
+.eyebrow::after{content:'';display:inline-block;height:1px;width:60px;background:var(--line);margin-left:10px;vertical-align:middle;}
+.panel-note{font-size:11px;color:var(--ink3);}
+
+/* ── TAGS ── */
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap;}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.tag-viv{background:var(--viv-t);color:var(--viv);} .tag-viv .dot{background:var(--viv);}
+.tag-hot{background:var(--hot-t);color:var(--hot);} .tag-hot .dot{background:var(--hot);}
+.tag-rest{background:var(--rest-t);color:var(--rest);} .tag-rest .dot{background:var(--rest);}
+.tag-crit{background:var(--crit-t);color:var(--crit);} .tag-crit .dot{background:var(--crit);}
+.tag-alto{background:var(--alto-t);color:var(--alto);} .tag-alto .dot{background:var(--alto);}
+.tag-med{background:var(--med-t);color:var(--med);} .tag-med .dot{background:var(--med);}
+.tag-baj{background:var(--baj-t);color:var(--baj);} .tag-baj .dot{background:var(--baj);}
+.tag-vac{background:var(--vac-t);color:var(--vac);} .tag-vac .dot{background:var(--vac);}
+.tag-out{background:transparent;border:1px solid var(--line);color:var(--ink3);}
+
+/* ── TABLES ── */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+.tbl th{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:7px 10px;border-bottom:1px solid var(--line);background:var(--paper);text-align:left;white-space:nowrap;}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--paper2);vertical-align:top;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(194,105,66,.04);}
+.tbl th:first-child,.tbl td:first-child{padding-left:14px;}
+
+/* ── FOCUS LIST ── */
+.focus-list{display:flex;flex-direction:column;gap:6px;}
+.focus-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);}
+.focus-item input[type=checkbox]{margin-top:2px;width:15px;height:15px;accent-color:var(--burg);cursor:pointer;flex-shrink:0;}
+.focus-text{flex:1;font-size:13px;}
+.focus-item.done .focus-text{color:var(--ink3);text-decoration:line-through;}
+
+/* ── AGENDA ── */
+.agenda-box{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:2px 14px;}
+.agenda-row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--paper2);font-size:13px;}
+.agenda-row:last-child{border-bottom:none;}
+.agenda-when{font-size:10.5px;font-weight:500;letter-spacing:.04em;color:var(--cop);width:90px;flex-shrink:0;padding-top:1px;}
+
+/* ── GANTT ── */
+.gantt{margin-top:12px;}
+.gantt-months{display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-bottom:3px;}
+.gantt-month{font-size:8.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding-left:2px;}
+.gantt-row{position:relative;margin-bottom:2px;}
+.gantt-grid{display:grid;grid-template-columns:repeat(20,1fr);gap:1px;}
+.gantt-cell{height:26px;background:var(--paper2);border-radius:1px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+.gantt-cell.filled{cursor:pointer;}
+.gantt-cell.filled:hover{filter:brightness(1.08);}
+.gantt-label{font-size:7.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.85);padding:0 2px;text-align:center;pointer-events:none;line-height:1;}
+.gantt-cell.ph1 .gantt-label,.gantt-cell.ph9 .gantt-label{color:rgba(30,24,20,.5);}
+.gantt-arrow{position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid rgba(0,0,0,.2);z-index:2;pointer-events:none;}
+.gantt-today{position:absolute;top:-18px;bottom:0;width:2px;background:var(--burg);opacity:.65;pointer-events:none;z-index:3;}
+.gantt-today-lbl{position:absolute;top:-17px;left:3px;font-size:8px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--burg);}
+.gantt-weeks{display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-top:2px;}
+.gantt-week{font-size:7.5px;color:var(--ink3);padding-left:2px;overflow:hidden;white-space:nowrap;}
+.gantt-cell.has-note::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--cop);}
+/* phase colors */
+.ph1{background:var(--ph1);} .ph2{background:var(--ph2);} .ph3{background:var(--ph3);}
+.ph4{background:var(--ph4);} .ph5{background:var(--ph5);} .ph6{background:var(--ph6);}
+.ph7{background:var(--ph7);} .ph8{background:var(--ph8);} .ph9{background:var(--ph9);}
+
+/* ── PROJECT CARDS ── */
+.proj-card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:14px 16px;margin-bottom:10px;}
+.proj-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+.proj-name{font-size:14px;font-weight:500;}
+.proj-tags{display:flex;gap:5px;flex-wrap:wrap;}
+.proj-meta{display:grid;grid-template-columns:90px 1fr;gap:3px 6px;font-size:12px;color:var(--ink2);margin:8px 0;}
+.proj-meta .k{font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);padding-top:1px;}
+.hito-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.hito-text{font-size:13px;font-weight:500;}
+.hito-date{font-size:11.5px;font-weight:300;color:var(--cop);}
+.client-pill{font-size:9.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--burg);border:1px solid var(--burg);border-radius:999px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;}
+.client-pill .dot{background:var(--burg);}
+
+/* ── NOTE ── */
+.note-area{margin-top:8px;}
+.note-area label{font-size:9.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:4px;}
+.note-area textarea{width:100%;min-height:40px;resize:vertical;font-family:var(--f);font-size:12.5px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:7px 10px;line-height:1.5;}
+.note-area textarea:focus{outline:none;border-color:var(--cop);}
+
+/* ── CARGA GRID ── */
+.carga-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;}
+.carga-card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:10px 12px;}
+.carga-card.vac{background:var(--vac-t);border-color:var(--vac);}
+.carga-name{font-weight:500;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px;}
+.carga-projs{font-size:11.5px;color:var(--ink3);}
+
+/* ── COLLAPSIBLES ── */
+details.collapse{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden;margin-bottom:6px;}
+details.collapse summary{cursor:pointer;padding:11px 14px;font-size:10.5px;font-weight:400;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);list-style:none;display:flex;align-items:center;gap:8px;}
+details.collapse summary::before{content:'+';font-size:14px;color:var(--cop);width:12px;}
+details.collapse[open] summary::before{content:'–';}
+details.collapse .inner{padding:0 14px 14px;}
+
+/* ── CHALLAN ── */
+.challan-request{border:1px solid var(--cop3);border-radius:var(--r);background:#FFF8F4;padding:16px;}
+.challan-request h4{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--cop);margin-bottom:12px;}
+.challan-form{display:grid;gap:8px;}
+.challan-form select,.challan-form input,.challan-form textarea{font-family:var(--f);font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;width:100%;}
+.challan-form select:focus,.challan-form input:focus,.challan-form textarea:focus{outline:none;border-color:var(--cop);}
+.challan-form label{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:3px;}
+.btn-cop{font-family:var(--f);font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;padding:9px 18px;border-radius:2px;cursor:pointer;border:none;background:var(--burg);color:var(--cop);}
+.btn-cop:hover{background:var(--burg2);}
+.btn-ghost{font-family:var(--f);font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;padding:7px 14px;border-radius:2px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink3);}
+.btn-ghost:hover{border-color:var(--cop);color:var(--cop);}
+.btn-danger{font-family:var(--f);font-size:11px;padding:7px 14px;border-radius:2px;cursor:pointer;border:1px solid var(--crit-t);background:transparent;color:var(--crit);}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(26,20,16,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
+.modal{background:var(--surface);border-radius:4px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(26,20,16,.22);overflow:hidden;}
+.modal-head{background:var(--burg);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:10.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);}
+.modal-sub{font-size:10px;font-weight:300;letter-spacing:.06em;color:rgba(194,105,66,.6);margin-top:2px;}
+.modal-close{background:none;border:none;color:rgba(194,105,66,.6);font-size:20px;cursor:pointer;padding:0 2px;line-height:1;}
+.modal-close:hover{color:var(--cop);}
+.modal-body{padding:18px;}
+.modal-body textarea{width:100%;min-height:90px;resize:vertical;font-family:var(--f);font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;line-height:1.5;}
+.modal-body textarea:focus{outline:none;border-color:var(--cop);}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;align-items:center;}
+.modal-foot .left{margin-right:auto;}
+
+/* ── SEMANAS CRÍTICAS ── */
+.sem-card{border-left:3px solid var(--line);padding:8px 12px;margin-bottom:6px;background:var(--surface);border-radius:0 var(--r) var(--r) 0;}
+.sem-card.crit{border-left-color:var(--crit);}
+.sem-card.alto{border-left-color:var(--alto);}
+.sem-card.med{border-left-color:var(--med);}
+.sem-week{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--cop);margin-bottom:4px;}
+.sem-items{font-size:12.5px;color:var(--ink2);}
+
+/* ── PRÓXIMAS SEMANAS ALE ── */
+.prox-card{margin-bottom:8px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;}
+.prox-head{background:var(--burg);color:var(--cop);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:7px 12px;}
+.prox-body{padding:10px 12px;background:var(--surface);}
+.prox-item{font-size:13px;color:var(--ink2);padding:3px 0;border-bottom:1px solid var(--paper2);}
+.prox-item:last-child{border-bottom:none;}
+.prox-item.alert{color:var(--crit);}
+.prox-item.warn{color:var(--alto);}
+
+/* ── FOOTER ── */
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:11px;font-weight:300;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);}
+.sync{display:flex;align-items:center;gap:6px;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--baj);}
+.sync.saving .sync-dot{background:var(--med);}
+.sync.error .sync-dot{background:var(--crit);}
+
+@media(max-width:640px){
+  .topbar{padding:14px 16px;}
+  .tab{padding:10px 12px;font-size:10px;}
+  .view-title{font-size:18px;}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name"><span>Alejandra Pombo</span><span>Design Studio</span></span>
+    <span class="brand-div"></span>
+    <span class="brand-sub">PM Estudio</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span class="update-badge" id="update-badge"></span>
+    <span class="week-badge" id="week-badge"></span>
+  </div>
+</header>
+<nav class="tabs" id="tabs"></nav>
+<div class="app"><main id="view"></main></div>
+<footer class="foot" style="max-width:1020px;margin:0 auto;padding-left:20px;padding-right:20px;">
+  <span class="sync" id="sync"><span class="sync-dot"></span>Sincronizado</span>
+  <button class="btn-ghost" id="export-btn">Exportar estado</button>
+</footer>
+<script>
+__DATA_PLACEHOLDER__
+</script>
+<script>
+// APDS PM Estudio — Lógica de la app
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function deptCls(d){
+  d=(d||'').toLowerCase();
+  if(d.includes('vivienda')) return 'tag-viv';
+  if(d.includes('hotel')) return 'tag-hot';
+  if(d.includes('restaurante')||d.includes('rest')) return 'tag-rest';
+  return 'tag-out';
+}
+function riskCls(r){
+  r=(r||'').toUpperCase();
+  if(r.includes('CRITICO')||r.includes('CRÍTICO')||r.includes('MUY ALTO')) return 'tag-crit';
+  if(r==='ALTO') return 'tag-alto';
+  if(r==='MEDIO') return 'tag-med';
+  if(r==='BAJO') return 'tag-baj';
+  if(r.includes('VACACIONES')) return 'tag-vac';
+  return 'tag-out';
+}
+function riskLbl(r){
+  r=(r||'').toUpperCase();
+  if(r.includes('CRITICO')||r.includes('CRÍTICO')||r.includes('MUY ALTO')) return 'Crítico';
+  if(r==='ALTO') return 'Alto';
+  if(r==='MEDIO') return 'Medio';
+  if(r==='BAJO') return 'Bajo';
+  if(r.includes('VACACIONES')) return 'Vacaciones';
+  return r;
+}
+function phaseCls(p){
+  if(!p) return '';
+  const up = p.toUpperCase();
+  if(up.includes('PROYECTO')||up.includes('ANTEPROYECTO')||up.includes('PROY')||up.includes('BASICO')||up.includes('PRESUPUESTO')||up.includes('VALORACION')||up.includes('FEEDBACK')||up.includes('RENDER')||up.includes('REUNION')||up.includes('REUNIÓN')||up.includes('IDEAS')||up.includes('MARKETING')||up.includes('EMPEZAR')) return 'ph1';
+  if(up.includes('OBRA')||up.includes('EJECUCION')||up.includes('INICIO')||up.includes('EMPIEZA')||up.includes('OBRA DE NUEVO')) return 'ph2';
+  if(up.includes('PEDIDO')||up.includes('CARPINTER')||up.includes('CERRAR DECO')||up.includes('TECHOS')||up.includes('REVISAR EQUIPAMIENTO')) return 'ph3';
+  if(up.includes('MONTAJE')||up.includes('VISITA')) return 'ph4';
+  if(up.includes('ENTREGA')||up.includes('FIN OBRA')||up.includes('CIERRE')||up.includes('TERMINAD')) return 'ph6';
+  if(up.includes('RENDERS')||up.includes('DECO')) return 'ph7';
+  if(up.includes('PARADO')||up.includes('PENDIENTE')||up.includes('LICENCIA')||up.includes('REPLANTEO')) return 'ph9';
+  return 'ph5';
+}
+function phaseShort(p){
+  if(!p) return '';
+  const up = p.toUpperCase();
+  if(up.includes('MONTAJE')) return 'MONT';
+  if(up.includes('ANTEPROYECTO')) return 'ANT';
+  if(up.includes('PROY BASICO')||up.includes('PROYECTO BASICO')) return 'PB';
+  if(up.includes('PROYECTO')||up.includes('PROY')) return 'PROY';
+  if(up.includes('PRESUPUESTO')||up.includes('PRESU')) return 'PRES';
+  if(up.includes('VALORACION')||up.includes('VALORACIÓN')) return 'VAL';
+  if(up.includes('OBRA')) return 'OBRA';
+  if(up.includes('PEDIDO')) return 'PED';
+  if(up.includes('CARPINTER')) return 'CARP';
+  if(up.includes('REUNIÓN')||up.includes('REUNION')) return 'REUN';
+  if(up.includes('ENTREGA')) return 'ENT';
+  if(up.includes('RENDERS')||up.includes('RENDER')) return 'REND';
+  if(up.includes('DECO')&&!up.includes('INICIO')) return 'DECO';
+  if(up.includes('VISITA')) return 'VIS';
+  if(up.includes('FIN OBRA')) return 'FIN';
+  if(up.includes('CIERRE')||up.includes('CERRAR')) return 'CIE';
+  if(up.includes('PARADO')) return '—';
+  if(up.includes('PENDIENTE')) return 'PEN';
+  if(up.includes('LICENCIA')) return 'LIC';
+  if(up.includes('FEEDBACK')) return 'FB';
+  if(up.includes('EMPEZAR')||up.includes('EMPIEZA')) return 'INI';
+  if(up.includes('REPLANTEO')) return 'REP';
+  return p.slice(0,4).toUpperCase();
+}
+
+// ── STORAGE ──────────────────────────────────────────────────────────────────
+const S = {
+  _c: {},
+  async load(id){
+    if(this._c[id]) return this._c[id];
+    let v = {check:{}, notes:{}};
+    try{
+      if(typeof window !== 'undefined' && window.storage){
+        const r = await window.storage.get('s:'+id, true);
+        if(r && r.value) v = JSON.parse(r.value);
+      }
+    }catch(e){}
+    try{
+      const ls = localStorage.getItem('apds:'+id);
+      if(ls) v = JSON.parse(ls);
+    }catch(e){}
+    this._c[id] = v; return v;
+  },
+  async save(id){
+    try{
+      if(typeof window !== 'undefined' && window.storage){
+        await window.storage.set('s:'+id, JSON.stringify(this._c[id]), true);
+      }
+    }catch(e){}
+    try{ localStorage.setItem('apds:'+id, JSON.stringify(this._c[id])); }catch(e){}
+    setSyncStatus('ok');
+  },
+  setCheck(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].check[k]=v; this.save(id); },
+  setNote(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].notes[k]=v; this.save(id); },
+};
+
+function setSyncStatus(s){
+  const el=document.getElementById('sync'); if(!el) return;
+  el.className='sync '+(s==='saving'?'saving':s==='error'?'error':'');
+  const dot=el.querySelector('.sync-dot'); if(dot) dot.className='sync-dot';
+  el.innerHTML=`<span class="sync-dot"></span>${s==='saving'?'Guardando…':s==='error'?'Sin conexión':'Sincronizado'}`;
+}
+
+// ── GANTT ──────────────────────────────────────────────────────────────────
+function renderGantt(proj, personId){
+  const tl = proj.tl || {};
+  const slug = proj.slug || proj.nombre.replace(/\s+/g,'_').toLowerCase();
+  const state = S._c[personId] || {check:{}, notes:{}};
+
+  // Cabecera meses
+  let monthsHtml = '';
+  MONTHS.forEach(([m, start, end]) => {
+    const span = end - start + 1;
+    monthsHtml += `<div class="gantt-month" style="grid-column:span ${span}">${m}</div>`;
+  });
+  // rellenar hasta 20
+  const filled = MONTHS.reduce((a,[,s,e])=>a+(e-s+1),0);
+  if(filled < 20) monthsHtml += `<div class="gantt-month" style="grid-column:span ${20-filled}"></div>`;
+
+  // Celdas
+  let cells = '';
+  const phases = Array.from({length:20},(_,i)=>tl[i]||null);
+  for(let i=0;i<20;i++){
+    const ph = phases[i];
+    const nextPh = phases[i+1];
+    const cls = ph ? `gantt-cell filled ${phaseCls(ph)}` : 'gantt-cell';
+    const noteKey = `cn:${slug}:${i}`;
+    const hasNote = !!(state.notes && state.notes[noteKey]);
+    const arrow = ph && nextPh && phaseCls(ph) !== phaseCls(nextPh) ? '<span class="gantt-arrow"></span>' : '';
+    const lbl = ph ? `<span class="gantt-label">${phaseShort(ph)}</span>` : '';
+    const noteClass = hasNote ? ' has-note' : '';
+    cells += ph
+      ? `<div class="${cls}${noteClass}" title="${ph} · sem ${WEEK_LABELS[i]}" data-slug="${slug}" data-week="${i}" data-phase="${ph}" data-person="${personId}" data-notekey="${noteKey}">${lbl}${arrow}</div>`
+      : `<div class="${cls}" title="Sem ${WEEK_LABELS[i]}"></div>`;
+  }
+
+  // Weeks
+  const weeksHtml = WEEK_LABELS.map(w=>`<div class="gantt-week">${w}</div>`).join('');
+  const todayPct = (TODAY_WEEK / 20 * 100).toFixed(2);
+
+  return `<div class="gantt">
+    <div class="gantt-months" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-bottom:3px;">${monthsHtml}</div>
+    <div class="gantt-row">
+      <div class="gantt-today" style="left:${todayPct}%"></div>
+      <div class="gantt-today-lbl" style="left:calc(${todayPct}% + 3px)">HOY</div>
+      <div class="gantt-grid">${cells}</div>
+    </div>
+    <div class="gantt-weeks" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-top:2px;">${weeksHtml}</div>
+  </div>`;
+}
+
+// ── MODAL NOTA DE CELDA ────────────────────────────────────────────────────
+function openCellModal(slug, weekIdx, phase, personId, noteKey){
+  const state = S._c[personId] || {check:{},notes:{}};
+  const existing = state.notes?.[noteKey] || '';
+  const weekLbl = WEEK_LABELS[weekIdx] || weekIdx;
+
+  const bd = document.createElement('div');
+  bd.className = 'modal-bg'; bd.id = 'cell-modal-bg';
+  bd.innerHTML = `<div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title">${slug.replace(/_/g,' ').toUpperCase()} · ${weekLbl}</div><div class="modal-sub">${phase}</div></div>
+      <button class="modal-close" id="m-close">×</button>
+    </div>
+    <div class="modal-body"><textarea id="m-ta" placeholder="Comentario para esta semana…">${existing}</textarea></div>
+    <div class="modal-foot">
+      ${existing?'<button class="btn-danger left" id="m-del">Borrar</button>':''}
+      <button class="btn-ghost" id="m-cancel">Cancelar</button>
+      <button class="btn-cop" id="m-save">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e=>{ if(e.target===bd) closeCellModal(); });
+  document.getElementById('m-close').onclick = closeCellModal;
+  document.getElementById('m-cancel').onclick = closeCellModal;
+  document.getElementById('m-save').onclick = ()=>{
+    const v = document.getElementById('m-ta').value.trim();
+    S.setNote(personId, noteKey, v);
+    const cell = document.querySelector(`[data-notekey="${noteKey}"]`);
+    if(cell){ v ? cell.classList.add('has-note') : cell.classList.remove('has-note'); }
+    closeCellModal();
+  };
+  const delBtn = document.getElementById('m-del');
+  if(delBtn) delBtn.onclick = ()=>{
+    S.setNote(personId, noteKey, '');
+    const cell = document.querySelector(`[data-notekey="${noteKey}"]`);
+    if(cell) cell.classList.remove('has-note');
+    closeCellModal();
+  };
+  document.getElementById('m-ta').focus();
+}
+function closeCellModal(){ const el=document.getElementById('cell-modal-bg'); if(el) el.remove(); }
+
+// ── COMPONENTES ──────────────────────────────────────────────────────────────
+function tagDept(d){
+  const cls=deptCls(d), lbl=d||'Todos';
+  return `<span class="tag ${cls}"><span class="dot"></span>${lbl}</span>`;
+}
+function tagRisk(r){
+  return `<span class="tag ${riskCls(r)}"><span class="dot"></span>${riskLbl(r)}</span>`;
+}
+function alertRow(a){
+  return `<div style="display:flex;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:6px;align-items:flex-start;">
+    <span style="flex-shrink:0;margin-top:2px;">${tagRisk(a.risk)}</span>
+    <div style="flex:1;min-width:0;">
+      <span style="font-weight:600;font-size:13px;">${a.proj}</span>
+      <span style="font-size:11px;color:var(--ink3);margin-left:6px;">${a.dept} · ${a.resp}</span>
+      <div style="font-size:13px;color:var(--ink2);margin-top:2px;">${a.text}</div>
+    </div>
+    <div style="font-size:11px;color:var(--ink3);white-space:nowrap;flex-shrink:0;padding-top:2px;">${a.fecha}</div>
+  </div>`;
+}
+
+function projCard(proj, personId){
+  const state = S._c[personId] || {check:{},notes:{}};
+  const slug = proj.slug || (proj.nombre||'').replace(/\s+/g,'_').toLowerCase();
+  const note = state.notes?.['note:'+slug] || '';
+  const hasTl = proj.tl && Object.keys(proj.tl).length > 0;
+  return `<div class="proj-card">
+    <div class="proj-top">
+      <div class="proj-name">${proj.nombre||proj.nombre}</div>
+      <div class="proj-tags">
+        ${proj.dept ? tagDept(proj.dept) : ''}
+        ${proj.riesgo||proj.intensidad ? tagRisk(proj.riesgo||proj.intensidad) : ''}
+        ${proj.estado ? `<span class="tag tag-out">${proj.estado}</span>` : ''}
+      </div>
+    </div>
+    ${proj.hito ? `<div class="hito-row"><span class="hito-text">${proj.hito}</span></div>` : ''}
+    ${proj.obs ? `<div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">${proj.obs}</div>` : ''}
+    ${proj.resp ? `<div class="proj-meta"><span class="k">Equipo</span><span>${proj.resp}</span></div>` : ''}
+    ${hasTl ? renderGantt({...proj, slug}, personId) : ''}
+    <div class="note-area" style="margin-top:${hasTl?'10px':'8px'}">
+      <label>Nota del equipo</label>
+      <textarea data-note="${slug}" data-person="${personId}" placeholder="Añadir nota…">${note}</textarea>
+    </div>
+  </div>`;
+}
+
+function focusItem(text, id, personId){
+  const state = S._c[personId] || {check:{},notes:{}};
+  const done = !!(state.check?.[id]);
+  return `<div class="focus-item${done?' done':''}">
+    <input type="checkbox" data-check="${id}" data-person="${personId}" ${done?'checked':''}>
+    <span class="focus-text">${text}</span>
+  </div>`;
+}
+
+function challanSection(filterProjs){
+  const rows = filterProjs
+    ? CHALLAN.filter(c=> filterProjs.some(p=> c.proj.toUpperCase().includes(p.toUpperCase().slice(0,6)) || p.toUpperCase().includes(c.proj.toUpperCase().slice(0,6))))
+    : CHALLAN;
+  const others = filterProjs ? CHALLAN.filter(c=> !rows.includes(c)) : [];
+
+  const tblRows = (list) => list.map(r=>`<tr>
+    <td>${tagRisk(r.riesgo)}</td>
+    <td><b>${r.proj}</b><br><span style="font-size:10.5px;color:var(--ink3);">${r.resp}</span></td>
+    <td><span class="tag tag-out">${r.fase}</span></td>
+    <td style="font-size:12px;">${r.estado}</td>
+    <td style="font-size:11px;white-space:nowrap;">${r.comprometida}</td>
+    <td style="font-size:11px;white-space:nowrap;${r.realista.startsWith('⚠')?'color:var(--alto);font-weight:500;':''}">${r.realista}</td>
+    <td style="font-size:12px;color:var(--ink2);">${r.next}</td>
+  </tr>`).join('');
+  const tbl = (list) => `<div class="tbl-wrap"><table class="tbl"><thead><tr>
+    <th>Prio</th><th>Proyecto</th><th>Fase</th><th>Estado</th><th>Comprometida</th><th>Realista</th><th>Próximo paso</th>
+  </tr></thead><tbody>${tblRows(list)}</tbody></table></div>`;
+
+  return `<div class="panel">
+    <div class="panel-head"><span class="eyebrow">Renders — Challan</span><span class="panel-note">${CHALLAN.length} proyectos en cola</span></div>
+    <div style="margin-bottom:10px;padding:8px 12px;background:var(--alto-t);border-radius:var(--r);font-size:12px;color:var(--alto);font-weight:500;">${CHALLAN_VAC}</div>
+    ${filterProjs && rows.length ? `<div style="font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px;">Mis proyectos en Challan</div>` : ''}
+    ${(filterProjs && rows.length) ? tbl(rows) : tbl(CHALLAN)}
+    ${others.length ? `<details class="collapse" style="margin-top:8px;"><summary>Resto de la cola (${others.length} proyectos)</summary><div class="inner">${tbl(others)}</div></details>` : ''}
+    <div style="margin-top:10px;padding:12px 14px;background:var(--cop3);border-radius:var(--r);border:1px dashed var(--cop);">
+      <div style="font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--cop);margin-bottom:8px;">+ Solicitar render a Challan</div>
+      <div class="challan-form">
+        <div><label>Proyecto</label><input id="ch-proj" type="text" placeholder="Nombre del proyecto"></div>
+        <div><label>Fase</label><select id="ch-fase"><option>F1 — Volumetría y capturas</option><option>F2 — Materialidad y acabados</option><option>F3 — Render final</option></select></div>
+        <div><label>Documentación disponible</label><input id="ch-doc" type="text" placeholder="Planos, 3D, vistas marcadas…"></div>
+        <div><label>Fecha comprometida con cliente</label><input id="ch-fecha" type="text" placeholder="ej. 22 jun"></div>
+        <div><label>Notas adicionales</label><textarea id="ch-notas" rows="2" style="min-height:0;" placeholder="Contexto, prioridad, solapamientos…"></textarea></div>
+        <button class="btn-cop" id="ch-submit">Enviar solicitud al PM</button>
+        <div id="ch-msg" style="font-size:12px;color:var(--baj);display:none;">✅ Solicitud registrada — el PM la revisará y la añadirá a la cola</div>
+      </div>
+    </div>
+    <details class="collapse" style="margin-top:8px;"><summary>Flujo Challan · F1 → F2 → F3</summary>
+      <div class="inner" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;">
+        ${CHALLAN_FLUJO.map(f=>`<div style="background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;">
+          <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);margin-bottom:4px;">${f.fase}</div>
+          <div style="font-size:12px;font-weight:500;margin-bottom:4px;">${f.titulo}</div>
+          <div style="font-size:11.5px;color:var(--ink3);line-height:1.5;">${f.desc}</div>
+        </div>`).join('')}
+      </div>
+    </details>
+    <details class="collapse" style="margin-top:6px;"><summary>Reglas operativas Challan</summary>
+      <div class="inner">${CHALLAN_REGLAS.map((r,i)=>`<div style="font-size:12px;color:var(--ink2);padding:5px 0;border-bottom:1px solid var(--paper2);">${i+1}. ${r}</div>`).join('')}</div>
+    </details>
+  </div>`;
+}
+
+// ── VISTAS ────────────────────────────────────────────────────────────────────
+let curPerson = 'javi';
+let filterDept = 'todos', filterRisk = 'todos', filterSearch = '';
+
+function renderMaster(){
+  const state = S._c['javi'] || {check:{},notes:{}};
+  let h = '';
+
+  h += `<div class="view-head">
+    <div><div class="view-title">Javi · Master</div><div class="view-sub">${WEEK_LABEL}</div></div>
+    <div class="view-tags">${tagDept('Vivienda')}${tagDept('Hoteles')}${tagDept('Restaurantes')}</div>
+  </div>`;
+
+  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas de la semana</span><span class="panel-note">${ALERTAS.length} activas</span></div>${ALERTAS.map(alertRow).join('')}</div>`;
+
+  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Mi foco esta semana</span></div><div class="focus-list">${(FOCO_SEMANA.javi||[]).map((t,i)=>focusItem(t,`javi-f${i}`,'javi')).join('')}</div></div>`;
+
+  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Esta semana en el estudio</span></div>
+    <div class="agenda-box">${AGENDA.map(a=>`<div class="agenda-row"><span class="agenda-when">${a.when}</span><span>${a.text}</span></div>`).join('')}</div></div>`;
+
+  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Montajes confirmados — julio</span></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fechas</th><th>Proyecto</th><th>Equipo</th><th>Dpto</th></tr></thead><tbody>
+    ${MONTAJES.map(m=>`<tr><td style="font-size:11px;white-space:nowrap;">${m.fechas}</td><td><b>${m.proj}</b></td><td>${m.equipo}</td><td>${tagDept(m.dept)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+
+  // Carga equipo
+  const cargaItems = PERSON_ORDER.filter(id=>id!=='ale').map(id=>{
+    const projs = PROJS_PERSONA[id]||[];
+    const isVac = (VAC[id]||'').includes('15–19 jun')||(VAC[id]||'').includes('15-19 jun');
+    return `<div class="carga-card${isVac?' vac':''}">
+      <div class="carga-name">${NOMBRE_PERSONA[id]}<span class="tag ${isVac?'tag-vac':'tag-out'}">${isVac?'Vacaciones':'Activo'}</span></div>
+      <div class="carga-projs">${projs.slice(0,5).join(' · ')}</div>
+    </div>`;
+  }).join('');
+  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Carga del equipo</span></div><div class="carga-grid">${cargaItems}</div></div>`;
+
+  h += challanSection(null);
+
+  // Master table
+  h += `<div class="panel">
+    <div class="panel-head"><span class="eyebrow">Master global de proyectos</span><span class="panel-note">${MASTER.length} proyectos</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+      <input type="text" id="m-search" placeholder="Buscar…" style="font-family:var(--f);font-size:12.5px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);min-width:160px;">
+      ${['todos','Vivienda','Hoteles','Restaurantes'].map(d=>`<button class="tag${d==='todos'?'':'-'+d.toLowerCase().slice(0,4)} tag fpill${filterDept===d?' active':''}" data-fdept="${d}" style="cursor:pointer;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:${filterDept===d?'var(--burg)':'var(--surface)'};color:${filterDept===d?'#fff':'var(--ink3)'};">${d}</button>`).join('')}
+      ${['todos','Crítico','Alto','Medio','Bajo'].map(r=>`<button class="fpill${filterRisk===r?' active':''}" data-frisk="${r}" style="cursor:pointer;font-size:10.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:${filterRisk===r?'var(--burg)':'var(--surface)'};color:${filterRisk===r?'#fff':'var(--ink3)'};">${r}</button>`).join('')}
+    </div>
+    <div id="master-tbl"></div>
+  </div>`;
+
+  // Mis proyectos
+  const myProjs = MASTER.filter(p=> (PROJS_PERSONA.javi||[]).some(n=> p.nombre.toUpperCase().includes(n.toUpperCase().slice(0,8)) || n.toUpperCase().includes(p.nombre.toUpperCase().slice(0,8))));
+  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Mis proyectos</span></div>${myProjs.map(p=>projCard({...p,slug:p.nombre.replace(/\s+/g,'_').toLowerCase()},'javi')).join('')}</div>`;
+
+  return h;
+}
+
+function renderMasterTable(){
+  const q = filterSearch.toLowerCase();
+  const rows = MASTER.filter(p=>{
+    if(filterDept!=='todos'){
+      const d=DEPT_PERSONA; // rough dept from resp
+      const resp=(p.resp||'').toLowerCase();
+      if(filterDept==='Vivienda' && !['alicia','olatz','paula','sara','andrea','cristina','nela'].some(n=>resp.includes(n)) && !(p.nombre||'').toUpperCase().match(/PEDRAZA|ZAHARA|LAGOS 1|ALCALA|FLORIDA|HERMOSILLA|MONTESQUINZA|RINCONADA|ALDAMA|SANTANDER VIV|IBIZA|VALENCIA|PALOMA|TORRE|TEPEYAC|SUR [37]/)) {/* skip */}
+      // simplified: just use intensidad/riesgo filter
+    }
+    if(filterRisk!=='todos'){
+      const rl=riskLbl(p.riesgo);
+      if(filterRisk==='Crítico' && !rl.includes('tico')) return false;
+      if(filterRisk==='Alto' && rl!=='Alto') return false;
+      if(filterRisk==='Medio' && rl!=='Medio') return false;
+      if(filterRisk==='Bajo' && rl!=='Bajo') return false;
+    }
+    if(q && !`${p.nombre} ${p.resp} ${p.estado} ${p.hito} ${p.obs}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const el=document.getElementById('master-tbl'); if(!el) return;
+  el.innerHTML=`<div class="tbl-wrap"><table class="tbl"><thead><tr>
+    <th>Proyecto</th><th>Responsable</th><th>Estado</th><th>Próximo hito</th><th>Riesgo</th><th>Observaciones</th>
+  </tr></thead><tbody>
+  ${rows.map(p=>`<tr>
+    <td><b>${p.nombre}</b></td>
+    <td style="font-size:12px;">${p.resp}</td>
+    <td>${p.estado}</td>
+    <td style="font-size:12px;">${p.hito}</td>
+    <td>${tagRisk(p.riesgo)}</td>
+    <td style="font-size:12px;color:var(--ink3);">${p.obs}</td>
+  </tr>`).join('')}
+  </tbody></table></div><div style="font-size:11px;color:var(--ink3);margin-top:6px;">${rows.length} de ${MASTER.length} proyectos</div>`;
+}
+
+function renderAle(){
+  let h='';
+  h+=`<div class="view-head">
+    <div><div class="view-title">Alejandra · CEO</div><div class="view-sub">${WEEK_LABEL} · Resumen ejecutivo</div></div>
+    <div class="view-tags"><span class="tag tag-vac"><span class="dot"></span>Vacaciones 15–19 jun</span></div>
+  </div>`;
+
+  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas — dónde puedes necesitar intervenir</span></div>${ALERTAS.map(alertRow).join('')}</div>`;
+
+  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Esta semana en el estudio</span></div>
+    <div class="agenda-box">${AGENDA.map(a=>`<div class="agenda-row"><span class="agenda-when">${a.when}</span><span>${a.text}</span></div>`).join('')}</div></div>`;
+
+  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Tu presencia comprometida</span></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Compromiso</th></tr></thead><tbody>
+    ${PRESENCIA_ALE.map(p=>`<tr><td style="font-size:11px;white-space:nowrap;font-weight:500;color:var(--cop);">${p.fecha}</td><td>${p.texto}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+
+  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Próximas semanas — tener en cuenta</span></div>
+    ${PROXIMAS.map(s=>`<div class="prox-card">
+      <div class="prox-head">${s.sem}</div>
+      <div class="prox-body">${s.items.map(i=>`<div class="prox-item${i.startsWith('🚨')?' alert':i.includes('sin resolver')||i.includes('⚠')?' warn':''}">${i}</div>`).join('')}</div>
+    </div>`).join('')}
+  </div>`;
+
+  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Montajes confirmados — julio</span></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fechas</th><th>Proyecto</th><th>Equipo</th><th>Dpto</th></tr></thead><tbody>
+    ${MONTAJES.map(m=>`<tr><td style="font-size:11px;white-space:nowrap;">${m.fechas}</td><td><b>${m.proj}</b></td><td>${m.equipo}</td><td>${tagDept(m.dept)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+
+  h += challanSection(null);
+  return h;
+}
+
+function renderPersonal(pid){
+  const state = S._c[pid] || {check:{},notes:{}};
+  const nombre = NOMBRE_PERSONA[pid]||pid;
+  const dept = DEPT_PERSONA[pid]||'';
+  const foco = FOCO_SEMANA[pid]||[];
+  const projNames = PROJS_PERSONA[pid]||[];
+  const isVac = (VAC[pid]||'').includes('15–19 jun');
+
+  let h='';
+  h+=`<div class="view-head">
+    <div><div class="view-title">${nombre}</div><div class="view-sub">${WEEK_LABEL}</div></div>
+    <div class="view-tags">${dept&&dept!=='todos'?tagDept(dept):''}${isVac?'<span class="tag tag-vac"><span class="dot"></span>Vacaciones</span>':''}</div>
+  </div>`;
+
+  if(foco.length){
+    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Foco esta semana</span></div>
+      <div class="focus-list">${foco.map((t,i)=>focusItem(t,`${pid}-f${i}`,pid)).join('')}</div></div>`;
+  }
+
+  // Alertas relevantes
+  const myAlerts = ALERTAS.filter(a=>{
+    const text=`${a.resp} ${a.proj} ${a.text}`.toLowerCase();
+    return text.includes(nombre.toLowerCase()) || projNames.some(p=>text.includes(p.toLowerCase().slice(0,6)));
+  });
+  if(myAlerts.length){
+    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas relevantes</span></div>${myAlerts.map(alertRow).join('')}</div>`;
+  }
+
+  // Proyectos
+  const myProjs = MASTER.filter(p=> projNames.some(n=> p.nombre.toUpperCase().includes(n.toUpperCase().slice(0,8)) || n.toUpperCase().includes(p.nombre.toUpperCase().slice(0,8))));
+  if(myProjs.length){
+    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Mis proyectos</span><span class="panel-note">${myProjs.length} activos</span></div>
+      ${myProjs.map(p=>projCard({...p,slug:p.nombre.replace(/\s+/g,'_').toLowerCase()},pid)).join('')}
+    </div>`;
+  }
+
+  // Challan
+  h += challanSection(projNames);
+
+  return h;
+}
+
+// ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
+function render(){
+  // Tabs
+  const tabLabels = {'javi':'Javi · Master','ale':'Alejandra · CEO'};
+  document.getElementById('tabs').innerHTML = PERSON_ORDER.map(id=>{
+    const lbl = tabLabels[id] || NOMBRE_PERSONA[id];
+    const isMaster = id==='javi';
+    return `<button class="tab${id===curPerson?' active':''}${isMaster?' tab-master':''}" data-tab="${id}">${lbl}</button>`;
+  }).join('');
+
+  document.getElementById('week-badge').textContent = WEEK_STAMP;
+  document.getElementById('update-badge').textContent = UPDATED;
+
+  const view = document.getElementById('view');
+  if(curPerson==='javi'){
+    filterDept='todos'; filterRisk='todos'; filterSearch='';
+    view.innerHTML = renderMaster();
+    renderMasterTable();
+  } else if(curPerson==='ale'){
+    view.innerHTML = renderAle();
+  } else {
+    view.innerHTML = renderPersonal(curPerson);
+  }
+
+  wireEvents();
+}
+
+function wireEvents(){
+  // Tabs
+  document.querySelectorAll('[data-tab]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      curPerson = el.dataset.tab;
+      await S.load(curPerson);
+      render();
+    });
+  });
+  // Checkboxes
+  document.querySelectorAll('[data-check]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      S.setCheck(el.dataset.person, el.dataset.check, el.checked);
+      el.closest('.focus-item').classList.toggle('done', el.checked);
+    });
+  });
+  // Notas proyecto
+  document.querySelectorAll('[data-note]').forEach(el=>{
+    el.addEventListener('change', ()=>{ S.setNote(el.dataset.person, 'note:'+el.dataset.note, el.value); });
+  });
+  // Celdas Gantt
+  document.querySelectorAll('[data-notekey]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      openCellModal(el.dataset.slug, parseInt(el.dataset.week), el.dataset.phase, el.dataset.person, el.dataset.notekey);
+    });
+    const state = S._c[el.dataset.person] || {check:{},notes:{}};
+    if(state.notes?.[el.dataset.notekey]) el.classList.add('has-note');
+  });
+  // Filtros master
+  document.querySelectorAll('[data-fdept]').forEach(el=>{
+    el.addEventListener('click', ()=>{ filterDept=el.dataset.fdept; renderMasterTable(); });
+  });
+  document.querySelectorAll('[data-frisk]').forEach(el=>{
+    el.addEventListener('click', ()=>{ filterRisk=el.dataset.frisk; renderMasterTable(); });
+  });
+  const ms=document.getElementById('m-search');
+  if(ms) ms.addEventListener('input', ()=>{ filterSearch=ms.value; renderMasterTable(); });
+  // Challan request
+  const chBtn=document.getElementById('ch-submit');
+  if(chBtn) chBtn.addEventListener('click', ()=>{
+    const proj=document.getElementById('ch-proj')?.value?.trim();
+    if(!proj){ alert('Indica el nombre del proyecto'); return; }
+    const key=`challan-req:${Date.now()}`;
+    const data={proj, fase:document.getElementById('ch-fase')?.value, doc:document.getElementById('ch-doc')?.value, fecha:document.getElementById('ch-fecha')?.value, notas:document.getElementById('ch-notas')?.value, quien:NOMBRE_PERSONA[curPerson], cuando:new Date().toLocaleString('es-ES')};
+    S.setNote('javi', key, JSON.stringify(data));
+    document.getElementById('ch-msg').style.display='block';
+    ['ch-proj','ch-doc','ch-fecha','ch-notas'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  });
+}
+
+// ── EXPORT ───────────────────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', async ()=>{
+  const out={_exported:new Date().toISOString(),_week:WEEK_LABEL,data:{}};
+  for(const id of PERSON_ORDER){ await S.load(id); out.data['s:'+id]=S._c[id]; }
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`pm_estado_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+});
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(async function init(){
+  for(const id of PERSON_ORDER) await S.load(id);
+  render();
+})();
+
+</script>
+</body>
+</html>
