@@ -253,8 +253,7 @@ const PERSON_ORDER = {json.dumps(PERSON_ORDER)};
 """
 
 # ── COMBINAR CON TEMPLATE ─────────────────────────────────────────────────────
-TMPL = os.path.join(BASE, 'app_template.html')
-html_out = open(TMPL, encoding='utf-8').read().replace('__DATA_PLACEHOLDER__', DATA_JS)
+html_out = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>APDS PM Estudio</title></head><body><script>' + DATA_JS + '</script></body></html>'
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, 'w', encoding='utf-8') as f:
