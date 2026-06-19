@@ -303,32 +303,18 @@ function phaseShort(p){
 // ── STORAGE ──────────────────────────────────────────────────────────────────
 const S = {
   _c: {},
-  async load(id){
+  load(id){
     if(this._c[id]) return this._c[id];
     let v = {check:{}, notes:{}};
-    try{
-      if(typeof window !== 'undefined' && window.storage){
-        const r = await window.storage.get('s:'+id, true);
-        if(r && r.value) v = JSON.parse(r.value);
-      }
-    }catch(e){}
-    try{
-      const ls = localStorage.getItem('apds:'+id);
-      if(ls) v = JSON.parse(ls);
-    }catch(e){}
+    try{ const ls = localStorage.getItem('apds:'+id); if(ls) v=JSON.parse(ls); }catch(e){}
     this._c[id] = v; return v;
   },
-  async save(id){
-    try{
-      if(typeof window !== 'undefined' && window.storage){
-        await window.storage.set('s:'+id, JSON.stringify(this._c[id]), true);
-      }
-    }catch(e){}
-    try{ localStorage.setItem('apds:'+id, JSON.stringify(this._c[id])); }catch(e){}
-    setSyncStatus('ok');
+  save(id){
+    try{ localStorage.setItem('apds:'+id, JSON.stringify(this._c[id])); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); }
   },
   setCheck(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].check[k]=v; this.save(id); },
   setNote(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].notes[k]=v; this.save(id); },
+}; this._c[id].notes[k]=v; this.save(id); },
 };
 
 function setSyncStatus(s){
@@ -788,11 +774,15 @@ document.getElementById('export-btn').addEventListener('click', async ()=>{
 });
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-(async function init(){
-  for(const id of PERSON_ORDER) await S.load(id);
+(function init(){
+  for(const id of PERSON_ORDER) S.load(id);
   render();
 })();
 
 </script>
 </body>
 </html>
+Listo
+Copia todo ese texto, pégalo en GitHub reemplazando el contenido actual del app_template.html, haz Commit changes y luego lanza el workflow en Actions.
+
+Antes nos ha 
