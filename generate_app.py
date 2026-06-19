@@ -268,16 +268,3 @@ print(f"\n✅ App generada: {OUT}")
 print(f"   Proyectos: {len(MASTER)} | Con timeline: {sum(1 for p in MASTER if p['tl'])}")
 print(f"   Alertas: {len(ALERTAS_JSON)} | Challan: {len(CHALLAN)} | Foco: {len(FOCO)} personas")
 print(f"   Semana índice: {TODAY_WEEK} | Actualizado: {hoy}")
-Listo
-Selecciona todo ese texto de arriba y cópialo. Luego:
-
-1. En GitHub → repositorio → clic en generate_app.py
-2. Clic en el lápiz ✏️
-3. Ctrl+A para seleccionar todo → borrar → pegar lo copiado
-4. Clic en "Commit changes" → "Commit changes"
-
-Después ve a Actions → "Regenerar PM Estudio App" → "Run workflow" → "Run workflow" verde.
-
-Mándame captura cuando termine.
-
-
