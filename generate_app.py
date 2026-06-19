@@ -10,7 +10,8 @@ from datetime import date
 BASE = os.path.dirname(os.path.abspath(__file__))
 EXCEL = os.path.join(BASE, 'PM_ESTUDIO_MASTER_COMPLETO.xlsx')
 OUT   = os.path.join(BASE, 'docs', 'index.html')
-TMPL  = os.path.join(BASE, 'app_template.html')
+HTML_BEFORE = open(os.path.join(BASE, 'app_template.html'), encoding='utf-8').read().split('__DATA_PLACEHOLDER__')[0] if os.path.exists(os.path.join(BASE, 'app_template.html')) and '__DATA_PLACEHOLDER__' in open(os.path.join(BASE, 'app_template.html'), encoding='utf-8').read() else '<!DOCTYPE html><html><body><script>'
+HTML_AFTER = open(os.path.join(BASE, 'app_template.html'), encoding='utf-8').read().split('__DATA_PLACEHOLDER__')[1] if os.path.exists(os.path.join(BASE, 'app_template.html')) and '__DATA_PLACEHOLDER__' in open(os.path.join(BASE, 'app_template.html'), encoding='utf-8').read() else '</script></body></html>'
 
 wb = openpyxl.load_workbook(EXCEL, data_only=True)
 print("Hojas:", wb.sheetnames)
@@ -252,8 +253,7 @@ const PERSON_ORDER = {json.dumps(PERSON_ORDER)};
 """
 
 # ── COMBINAR CON TEMPLATE ─────────────────────────────────────────────────────
-template = open(TMPL, encoding='utf-8').read()
-html_out = template.replace('__DATA_PLACEHOLDER__', DATA_JS)
+html_out = open(TMPL, encoding='utf-8').read().replace('__DATA_PLACEHOLDER__', DATA_JS) if '__DATA_PLACEHOLDER__' in open(TMPL, encoding='utf-8').read() else '<script>' + DATA_JS + '</script>'
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, 'w', encoding='utf-8') as f:
