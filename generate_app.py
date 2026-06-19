@@ -1,8 +1,3 @@
-bash
-
-cat /home/claude/generate_app_v2.py
-Salida
-
 #!/usr/bin/env python3
 """
 APDS PM Estudio — Generador de app
