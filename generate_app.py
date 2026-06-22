@@ -226,6 +226,8 @@ CHALLAN_REGLAS = [
     'Al firmar contrato con renders: verificar cola y validar fecha realista ANTES de comprometerse.',
 ]
 
+AGENDA_DATA = [{"when": "Lun\u2013Vie", "text": "Alejandra y Andrea de vacaciones"}, {"when": "Mar 17", "text": "Pedraza \u2014 visita + arranque traslado de mobiliario (Olatz + Paula)"}, {"when": "Jue 18", "text": "Torre Valencia \u2014 reuni\u00f3n con Emir para cerrar dise\u00f1o de ba\u00f1os (Paula)"}, {"when": "Jue 18", "text": "Hip\u00f3dromo \u2014 visita con Sof\u00eda, Laia, Naiara y PM"}, {"when": "Vie 19", "text": "Vincci Valencia \u2014 deadline propuesta revestimiento ZZCC (Marta)"}, {"when": "Toda la sem.", "text": "Montesquinza \u2014 entrega proyecto completo a Consultores (Sara + Nela)"}, {"when": "Toda la sem.", "text": "Joann \u2014 render Entrada/Sal\u00f3n Central (compromiso semanal \u00b7 Sof\u00eda)"}]
+
 # ── GENERAR DATA JS ───────────────────────────────────────────────────────────
 DATA_JS = f"""
 const WEEK_LABELS = {json.dumps(WEEK_LABELS)};
@@ -248,6 +250,7 @@ const PROJS_PERSONA = {json.dumps(PROJS_PERSONA, ensure_ascii=False)};
 const DEPT_PERSONA = {json.dumps(DEPT_PERSONA, ensure_ascii=False)};
 const NOMBRE_PERSONA = {json.dumps(NOMBRE_PERSONA, ensure_ascii=False)};
 const VAC = {json.dumps(VAC, ensure_ascii=False)};
+const AGENDA = {json.dumps(AGENDA_DATA, ensure_ascii=False)};
 const PERSON_ORDER = {json.dumps(PERSON_ORDER)};
 """
 
