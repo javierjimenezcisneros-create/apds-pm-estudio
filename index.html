@@ -255,7 +255,6 @@ const AGENDA = [{"when": "Lun–Vie", "text": "Alejandra y Andrea de vacaciones"
 const PERSON_ORDER = ["javi", "ale", "alicia", "olatz", "paula", "sara", "andrea", "cristina", "nela", "sofia", "laia", "naiara", "marta", "jesus"];
 
 </script>
-</script>
 <script>
 // APDS PM Estudio — Lógica de la app
 
@@ -783,4 +782,4 @@ function wireEvents(){
     const data={proj, fase:document.getElementById('ch-fase')?.value, doc:document.getElementById('ch-doc')?.value, fecha:document.getElementById('ch-fecha')?.value, notas:document.getElementById('ch-notas')?.value, quien:NOMBRE_PERSONA[curPerson], cuando:new Date().toLocaleString('es-ES')};
     S.setNote('javi', key, JSON.stringify(data));
     document.getElementById('ch-msg').style.display='block';
-    ['ch-proj','ch-doc','ch-fecha','ch-notas'].forEach(id=>{ const el=document.getElementById(id); if(el)
+    ['ch-proj','ch-doc','ch-fecha','ch-notas'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=
