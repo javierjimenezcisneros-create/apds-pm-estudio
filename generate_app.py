@@ -153,65 +153,53 @@ ALERTAS_JSON = [{'proj': p['nombre'], 'dept': p['dept'], 'resp': p['resp'],
                 for p in ALERTAS]
 
 # ── STATIC DATA ───────────────────────────────────────────────────────────────
-PROJS_PERSONA = {
-    'javi':    ['LAGOS 132','ALCALÁ 58'],
-    'alicia':  ['PEDRAZA','LAGOS 105','HERMOSILLA','TORRE VALENCIA','ALCALÁ 58'],
-    'olatz':   ['CAMINO SUR 70','PEDRAZA','VIV GAMAL STO DOMINGO','VIV PALOMA RD'],
-    'paula':   ['ZAHARA','LA FLORIDA','TEPEYAC','TORRE VALENCIA'],
-    'sara':    ['VALENCIA','VIUDA ALDAMA','SANTANDER VIV','IBIZA','MONTESQUINZA'],
-    'andrea':  ['VIV PALOMA RD','VALENCIA','MONTESQUINZA','LAGOS 105'],
-    'cristina':['CAMINO SUR 70','LA RINCONADA'],
-    'nela':    ['MONTESQUINZA','CAMINO SUR 35','HERMOSILLA'],
-    'sofia':   ['LAGOS 132','VIV GAMAL STO DOMINGO','JOANN','FOX','PUERTO RICO','COBUE'],
-    'laia':    ['FOX','BERNABÉU','ALTHEON','HIPÓDROMO','COBUE'],
-    'naiara':  ['FOX','BERNABÉU','RUBAIYAT','HIPÓDROMO'],
-    'marta':   ['DON RAMÓN','ONE SHOT BILBAO','VINCCI VALENCIA'],
-    'jesus':   ['ONE SHOT BILBAO','ROCA MAYA','VÍA 66','MARTÍNEZ CAMPOS','PSN OFICINAS'],
-    'ale':     [],
+# ── PERSONAS (extraído del Excel) ───────────────────────────────────────────
+NOMBRE_MAP_FOCO = {
+    'PM': 'javi', 'Sofía': 'sofia', 'Laia': 'laia', 'Paula': 'paula',
+    'Sara': 'sara', 'Naiara': 'naiara', 'Olatz': 'olatz', 'Marta': 'marta',
+    'Andrea': 'andrea', 'Cristina': 'cristina', 'Nela': 'nela',
+    'Jesús': 'jesus', 'Alejandra — CEO': 'ale'
 }
-DEPT_PERSONA = {
-    'javi':'todos','alicia':'Vivienda','olatz':'Vivienda','paula':'Vivienda',
-    'sara':'Vivienda','andrea':'Vivienda','cristina':'Vivienda','nela':'Vivienda',
-    'sofia':'Restaurantes','laia':'Restaurantes','naiara':'Restaurantes',
-    'marta':'Hoteles','jesus':'Hoteles','ale':'todos',
+NOMBRE_DISPLAY = {
+    'javi': 'Javi', 'sofia': 'Sofía', 'laia': 'Laia', 'paula': 'Paula',
+    'sara': 'Sara', 'naiara': 'Naiara', 'olatz': 'Olatz', 'marta': 'Marta',
+    'andrea': 'Andrea', 'cristina': 'Cristina', 'nela': 'Nela',
+    'jesus': 'Jesús', 'ale': 'Alejandra'
 }
-NOMBRE_PERSONA = {
-    'javi':'Javi','alicia':'Alicia','olatz':'Olatz','paula':'Paula','sara':'Sara',
-    'andrea':'Andrea','cristina':'Cristina','nela':'Nela','sofia':'Sofía',
-    'laia':'Laia','naiara':'Naiara','marta':'Marta','jesus':'Jesús','ale':'Alejandra',
-}
-VAC = {
-    'ale':'15–19 jun · 3–21 ago','andrea':'15–19 jun · 3–21 ago',
-    'javi':'3–21 ago','paula':'22 jun – 21 ago','sara':'3–21 ago',
-    'cristina':'20 jul – 10 ago','olatz':'17–28 ago','sofia':'10–24 ago',
-    'laia':'3–14 ago','naiara':'6–10 jul · 17–21 ago',
-    'marta':'3–7 ago','jesus':'13–31 jul',
-}
-MONTAJES = [
-    {'fechas':'6–10 jul','proj':'Camino Sur 70','equipo':'Cristina / Olatz','dept':'Vivienda'},
-    {'fechas':'6–14 jul','proj':'Pedraza 1º','equipo':'Olatz + Paula','dept':'Vivienda'},
-    {'fechas':'13–15 jul','proj':'Zahara','equipo':'Paula + Alejandra','dept':'Vivienda'},
-    {'fechas':'13–26 jul','proj':'Gamal RD','equipo':'Sofía · Olatz · Alejandra','dept':'Vivienda'},
-    {'fechas':'21–24 jul','proj':'Valencia','equipo':'Sara + Andrea + Alejandra','dept':'Vivienda'},
-    {'fechas':'24–31 ago','proj':'Don Ramón','equipo':'Marta','dept':'Hoteles'},
-]
-PRESENCIA_ALE = [
-    {'fecha':'Lun 22 jun','texto':'Presentación Altheon en Barcelona con Laia'},
-    {'fecha':'25 jun','texto':'Viaje a Sevilla con Marta y Sara — Don Ramón'},
-    {'fecha':'13–15 jul','texto':'Zahara — montaje'},
-    {'fecha':'20 jul','texto':'Gamal RD — viaje a República Dominicana'},
-    {'fecha':'21–24 jul','texto':'Valencia — entrega oficial con Sara y Andrea'},
-    {'fecha':'15–19 jun · 3–21 ago','texto':'Vacaciones'},
-]
-PROXIMAS = [
-    {'sem':'22 jun','alerta':'MEDIO','items':['Reunión Lagos 105 + Pedro (PM cliente)','Reunión Tepeyac (24 jun)','Visita PSN con Raúl','Paula de vacaciones desde lun 22','Altheon — presentación Barcelona (Laia + Alejandra)']},
-    {'sem':'6–10 jul','alerta':'CRITICO','items':['🚨 MÁXIMOS MONTAJES: CaminoSur70 (6-10) + Pedraza 1º (6-14)','Gamal RD arranca el 13','Equipo muy distribuido']},
-    {'sem':'13–17 jul','alerta':'CRITICO','items':['🚨 Zahara (13-15) + Pedraza 2º (15-24) + Gamal RD en curso','Jesús inicia vacaciones (13 jul)','Conflicto Olatz/Paula sin resolver']},
-    {'sem':'20–24 jul','alerta':'ALTO','items':['Gamal RD (Alejandra entra 20)','Valencia montaje (21-24)','One Shot Bilbao (27-30, Marta)']},
-    {'sem':'3–21 ago','alerta':'CRITICO','items':['Estudio muy reducido — vacaciones generalizadas','Bernabéu montaje agosto sin resolver','Challan vacaciones 1–15 ago ⚠']},
-]
-PERSON_ORDER = ['javi','ale','alicia','olatz','paula','sara','andrea',
-                'cristina','nela','sofia','laia','naiara','marta','jesus']
+PROJS_PERSONA = {}
+DEPT_PERSONA = {}
+NOMBRE_PERSONA = {}
+FOCO_SEMANA_raw = {}
+PERSON_ORDER = []
+
+ws_foco = wb['👤 FOCO POR PERSONA']
+for row in ws_foco.iter_rows(min_row=3, max_row=ws_foco.max_row, max_col=ws_foco.max_column, values_only=True):
+    if not row[0]: continue
+    nombre_excel = str(row[0]).strip()
+    pid = NOMBRE_MAP_FOCO.get(nombre_excel)
+    if not pid: continue
+    dept_raw = str(row[1] or '').strip()
+    if 'VIV' in dept_raw and 'HOT' not in dept_raw and 'RES' not in dept_raw:
+        dept = 'Vivienda'
+    elif 'HOT' in dept_raw and 'VIV' not in dept_raw and 'RES' not in dept_raw:
+        dept = 'Hoteles'
+    elif 'RES' in dept_raw and 'VIV' not in dept_raw and 'HOT' not in dept_raw:
+        dept = 'Restaurantes'
+    else:
+        dept = 'todos'
+    projs_raw = str(row[2] or '').strip()
+    projs = [p.strip().upper() for p in projs_raw.replace('·', '|').split('|') if p.strip() and len(p.strip()) > 2]
+    foco_raw = str(row[3] or '').strip()
+    foco_items = [f.strip() for f in foco_raw.split('·') if f.strip() and len(f.strip()) > 4]
+    NOMBRE_PERSONA[pid] = NOMBRE_DISPLAY.get(pid, nombre_excel)
+    DEPT_PERSONA[pid] = dept
+    PROJS_PERSONA[pid] = projs[:8]
+    FOCO_SEMANA_raw[pid] = foco_items[:6]
+    PERSON_ORDER.append(pid)
+
+if 'ale' in PERSON_ORDER:
+    PERSON_ORDER.remove('ale')
+    PERSON_ORDER.insert(1, 'ale')
 CHALLAN_FLUJO = [
     {'fase':'F1','titulo':'Volumetría y capturas','desc':'Planos + 3D + vistas marcadas. ~1 semana desde doc completa. Capturas IA internas primero → reunión cliente para definir dirección.'},
     {'fase':'F2','titulo':'Materialidad y acabados','desc':'Toda la info de acabados y mobiliario. 2–3 días solo acabados · 1 semana si hay mobiliario. Cambios: 1–2 días/ronda.'},
@@ -227,6 +215,42 @@ CHALLAN_REGLAS = [
 ]
 
 AGENDA_DATA = [{"when": "Lun\u2013Vie", "text": "Alejandra y Andrea de vacaciones"}, {"when": "Mar 17", "text": "Pedraza \u2014 visita + arranque traslado de mobiliario (Olatz + Paula)"}, {"when": "Jue 18", "text": "Torre Valencia \u2014 reuni\u00f3n con Emir para cerrar dise\u00f1o de ba\u00f1os (Paula)"}, {"when": "Jue 18", "text": "Hip\u00f3dromo \u2014 visita con Sof\u00eda, Laia, Naiara y PM"}, {"when": "Vie 19", "text": "Vincci Valencia \u2014 deadline propuesta revestimiento ZZCC (Marta)"}, {"when": "Toda la sem.", "text": "Montesquinza \u2014 entrega proyecto completo a Consultores (Sara + Nela)"}, {"when": "Toda la sem.", "text": "Joann \u2014 render Entrada/Sal\u00f3n Central (compromiso semanal \u00b7 Sof\u00eda)"}]
+
+
+MONTAJES = [
+    {'fechas':'6–10 jul','proj':'Camino Sur 70','equipo':'Cristina / Olatz','dept':'Vivienda'},
+    {'fechas':'6–14 jul','proj':'Pedraza 1º','equipo':'Olatz + Paula','dept':'Vivienda'},
+    {'fechas':'13–15 jul','proj':'Zahara','equipo':'Paula + Alejandra','dept':'Vivienda'},
+    {'fechas':'13–26 jul','proj':'Gamal RD','equipo':'Sofía · Olatz · Alejandra','dept':'Vivienda'},
+    {'fechas':'15–24 jul','proj':'Pedraza 2º','equipo':'Olatz + Paula','dept':'Vivienda'},
+    {'fechas':'21–24 jul','proj':'Valencia','equipo':'Sara + Andrea + Alejandra','dept':'Vivienda'},
+    {'fechas':'24–31 ago','proj':'Don Ramón','equipo':'Marta','dept':'Hoteles'},
+]
+PRESENCIA_ALE = [
+    {'fecha':'Lun 22 jun','texto':'Presentación Altheon en Barcelona con Laia'},
+    {'fecha':'25 jun','texto':'Viaje a Sevilla con Marta y Sara — Don Ramón + Hotel Sevilla'},
+    {'fecha':'13–15 jul','texto':'Zahara — montaje'},
+    {'fecha':'20 jul','texto':'Gamal RD — viaje a República Dominicana'},
+    {'fecha':'21–24 jul','texto':'Valencia — entrega oficial con Sara y Andrea'},
+    {'fecha':'3–21 ago','texto':'Vacaciones'},
+]
+PROXIMAS = [
+    {'sem':'22 jun','alerta':'MEDIO','items':['Reunión Lagos 105 + Pedro (PM cliente)','Reunión cliente Tepeyac (24 jun)','Visita PSN con Raúl','Paula de vacaciones desde hoy']},
+    {'sem':'29 jun','alerta':'BAJO','items':['Visita Santander con Sara','Ibiza reunión deco 2-3jul','Proyecto Hall Viuda de Aldama','Montajes Rubaiyat últimas fases']},
+    {'sem':'6–10 jul','alerta':'CRITICO','items':['🚨 MÁXIMOS MONTAJES: CaminoSur70 (6-10) + Pedraza 1º (6-10) + inicio Gamal RD (13)','Equipo muy distribuido']},
+    {'sem':'13–17 jul','alerta':'CRITICO','items':['🚨 Zahara (13-15) + Pedraza 2º (15-24) + Gamal RD en curso','Jesús inicia vacaciones','Conflicto Olatz/Paula sin resolver']},
+    {'sem':'20–24 jul','alerta':'ALTO','items':['Gamal RD (Alejandra entra 20)','Valencia montaje (21-24)','One Shot Bilbao (27-30, Marta)']},
+    {'sem':'3–21 ago','alerta':'CRITICO','items':['Estudio muy reducido — vacaciones generalizadas','Bernabéu montaje agosto sin resolver','Challan vacaciones 1–15 ago ⚠']},
+]
+
+
+VAC = {
+    'ale':'15–19 jun · 3–21 ago','andrea':'15–19 jun · 3–21 ago',
+    'javi':'3–21 ago','paula':'22 jun – 21 ago','sara':'3–21 ago',
+    'cristina':'20 jul – 10 ago','olatz':'17–28 ago','sofia':'10–24 ago',
+    'laia':'3–14 ago','naiara':'6–10 jul · 17–21 ago',
+    'marta':'3–7 ago','jesus':'13–31 jul',
+}
 
 # ── GENERAR DATA JS ───────────────────────────────────────────────────────────
 DATA_JS = f"""
@@ -245,7 +269,7 @@ const CHALLAN = {json.dumps(CHALLAN, ensure_ascii=False)};
 const CHALLAN_FLUJO = {json.dumps(CHALLAN_FLUJO, ensure_ascii=False)};
 const CHALLAN_REGLAS = {json.dumps(CHALLAN_REGLAS, ensure_ascii=False)};
 const CHALLAN_VAC = "🏖 Challan de vacaciones 1–15 agosto — cualquier render previsto en agosto debe cerrarse ANTES del 1 ago.";
-const FOCO_SEMANA = {json.dumps(FOCO, ensure_ascii=False)};
+const FOCO_SEMANA = {json.dumps(FOCO_SEMANA_raw, ensure_ascii=False)};
 const PROJS_PERSONA = {json.dumps(PROJS_PERSONA, ensure_ascii=False)};
 const DEPT_PERSONA = {json.dumps(DEPT_PERSONA, ensure_ascii=False)};
 const NOMBRE_PERSONA = {json.dumps(NOMBRE_PERSONA, ensure_ascii=False)};
