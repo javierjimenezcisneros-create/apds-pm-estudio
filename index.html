@@ -604,7 +604,7 @@ function renderMasterTable(){
     if(filterDept!=='todos'){
       const d=DEPT_PERSONA; // rough dept from resp
       const resp=(p.resp||'').toLowerCase();
-      if(filterDept==='Vivienda' && !['alicia','olatz','paula','sara','andrea','cristina','nela'].some(n=>resp.includes(n)) && !(p.nombre||'').toUpperCase().match(/PEDRAZA|ZAHARA|LAGOS 1|ALCALA|FLORIDA|HERMOSILLA|MONTESQUINZA|RINCONADA|ALDAMA|SANTANDER VIV|IBIZA|VALENCIA|PALOMA|TORRE|TEPEYAC|SUR [37]/)) {/* skip */}
+      if(filterDept==='Vivienda' && !['olatz','paula','sara','andrea','cristina','nela'].some(n=>resp.includes(n)) && !(p.nombre||'').toUpperCase().match(/PEDRAZA|ZAHARA|LAGOS 1|ALCALA|FLORIDA|HERMOSILLA|MONTESQUINZA|RINCONADA|ALDAMA|SANTANDER VIV|IBIZA|VALENCIA|PALOMA|TORRE|TEPEYAC|SUR [37]/)) {/* skip */}
       // simplified: just use intensidad/riesgo filter
     }
     if(filterRisk!=='todos'){
