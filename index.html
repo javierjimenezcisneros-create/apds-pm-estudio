@@ -334,6 +334,8 @@ function phaseShort(p){
   if(up.includes('FEEDBACK')) return 'FB';
   if(up.includes('EMPEZAR')||up.includes('EMPIEZA')) return 'INI';
   if(up.includes('REPLANTEO')) return 'REP';
+  if(up.includes('ALEJANDRA')) return 'ALE';
+  if(up.includes('FUERA')) return 'FUERA';
   return p.slice(0,4).toUpperCase();
 }
 
@@ -399,7 +401,7 @@ function renderGantt(proj, personId){
 
   return `<div class="gantt">
     <div class="gantt-months" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-bottom:3px;">${monthsHtml}</div>
-    <div class="gantt-row" onclick="openGanttModal(MASTER.find(p=>p.nombre===${JSON.stringify(proj.nombre)})||proj)" style="cursor:pointer;" title="Clic para ver planificación completa">
+    <div class="gantt-row" data-gantt-expand data-nombre="${proj.nombre.replace(/"/g,'&quot;')}" style="cursor:pointer;" title="Clic para ver planificación completa">
       <div class="gantt-today" style="left:${todayPct}%"></div>
       <div class="gantt-today-lbl" style="left:calc(${todayPct}% + 3px)">HOY</div>
       <div class="gantt-grid">${cells}</div>
@@ -505,59 +507,6 @@ function focusItem(text, id, personId){
   </div>`;
 }
 
-function rendersSection(filterProjs){
-  const rows = filterProjs
-    ? RENDERS.filter(c=> filterProjs.some(p=> c.proj.toUpperCase().includes(p.toUpperCase().slice(0,6)) || p.toUpperCase().includes(c.proj.toUpperCase().slice(0,6))))
-    : RENDERS;
-  const others = filterProjs ? RENDERS.filter(c=> !rows.includes(c)) : [];
-
-  const tblRows = (list) => list.map(r=>`<tr>
-    <td>${tagRisk(r.riesgo)}</td>
-    <td><b>${r.proj}</b><br><span style="font-size:10.5px;color:var(--ink3);">${r.resp}</span></td>
-    <td><span class="tag tag-out">${r.fase}</span></td>
-    <td style="font-size:12px;">${r.estado}</td>
-    <td style="font-size:11px;white-space:nowrap;">${r.comprometida}</td>
-    <td style="font-size:11px;white-space:nowrap;${r.realista.startsWith('⚠')?'color:var(--alto);font-weight:500;':''}">${r.realista}</td>
-    <td style="font-size:12px;color:var(--ink2);">${r.next}</td>
-  </tr>`).join('');
-  const tbl = (list) => `<div class="tbl-wrap"><table class="tbl"><thead><tr>
-    <th>Prio</th><th>Proyecto</th><th>Fase</th><th>Estado</th><th>Comprometida</th><th>Realista</th><th>Próximo paso</th>
-  </tr></thead><tbody>${tblRows(list)}</tbody></table></div>`;
-
-  return `<div class="panel">
-    <div class="panel-head"><span class="eyebrow">Renders — Challan</span><span class="panel-note">${RENDERS.length} proyectos en cola</span></div>
-    <div style="margin-bottom:10px;padding:8px 12px;background:var(--alto-t);border-radius:var(--r);font-size:12px;color:var(--alto);font-weight:500;">${CHALLAN_VAC}</div>
-    ${filterProjs && rows.length ? `<div style="font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px;">Mis proyectos en Challan</div>` : ''}
-    ${(filterProjs && rows.length) ? tbl(rows) : tbl(RENDERS)}
-    ${others.length ? `<details class="collapse" style="margin-top:8px;"><summary>Resto de la cola (${others.length} proyectos)</summary><div class="inner">${tbl(others)}</div></details>` : ''}
-    <div style="margin-top:10px;padding:12px 14px;background:var(--cop3);border-radius:var(--r);border:1px dashed var(--cop);">
-      <div style="font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--cop);margin-bottom:8px;">+ Solicitar render a Challan</div>
-      <div class="challan-form">
-        <div><label>Proyecto</label><input id="ch-proj" type="text" placeholder="Nombre del proyecto"></div>
-        <div><label>Fase</label><select id="ch-fase"><option>F1 — Volumetría y capturas</option><option>F2 — Materialidad y acabados</option><option>F3 — Render final</option></select></div>
-        <div><label>Documentación disponible</label><input id="ch-doc" type="text" placeholder="Planos, 3D, vistas marcadas…"></div>
-        <div><label>Fecha comprometida con cliente</label><input id="ch-fecha" type="text" placeholder="ej. 22 jun"></div>
-        <div><label>Notas adicionales</label><textarea id="ch-notas" rows="2" style="min-height:0;" placeholder="Contexto, prioridad, solapamientos…"></textarea></div>
-        <button class="btn-cop" id="ch-submit">Enviar solicitud al PM</button>
-        <div id="ch-msg" style="font-size:12px;color:var(--baj);display:none;">✅ Solicitud registrada — el PM la revisará y la añadirá a la cola</div>
-      </div>
-    </div>
-    <details class="collapse" style="margin-top:8px;"><summary>Flujo Challan · F1 → F2 → F3</summary>
-      <div class="inner" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;">
-        ${CHALLAN_FLUJO.map(f=>`<div style="background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;">
-          <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);margin-bottom:4px;">${f.fase}</div>
-          <div style="font-size:12px;font-weight:500;margin-bottom:4px;">${f.titulo}</div>
-          <div style="font-size:11.5px;color:var(--ink3);line-height:1.5;">${f.desc}</div>
-        </div>`).join('')}
-      </div>
-    </details>
-    <details class="collapse" style="margin-top:6px;"><summary>Reglas operativas Challan</summary>
-      <div class="inner">${CHALLAN_REGLAS.map((r,i)=>`<div style="font-size:12px;color:var(--ink2);padding:5px 0;border-bottom:1px solid var(--paper2);">${i+1}. ${r}</div>`).join('')}</div>
-    </details>
-  </div>`;
-}
-
-// ── VISTAS ────────────────────────────────────────────────────────────────────
 curPerson = 'javi';
 filterDept = 'todos', filterRisk = 'todos', filterSearch = '';
 
@@ -932,26 +881,6 @@ function closeGanttModal(){
   if(el)el.remove();
 }
 
-function phaseShort(p){
-  if(!p)return'';
-  const u=p.toUpperCase();
-  if(u.includes('MONTAJE'))return'MONT';
-  if(u.includes('ANTEPROYECTO'))return'ANT';
-  if(u.includes('PROY BASICO')||u.includes('PROYECTO BASICO'))return'PB';
-  if(u.includes('PROYECTO')||u.includes('PROY'))return'PROY';
-  if(u.includes('PRESUPUESTO'))return'PRES';
-  if(u.includes('OBRA'))return'OBRA';
-  if(u.includes('PEDIDO'))return'PED';
-  if(u.includes('REUNIÓN')||u.includes('REUNION'))return'REUN';
-  if(u.includes('ENTREGA'))return'ENT';
-  if(u.includes('RENDERS')||u.includes('RENDER'))return'REND';
-  if(u.includes('DECO'))return'DECO';
-  if(u.includes('VISITA'))return'VIS';
-  if(u.includes('ALEJANDRA'))return'ALE';
-  if(u.includes('FUERA'))return'FUERA';
-  return p.slice(0,4).toUpperCase();
-}
-
 function wireEvents(){
   // Tabs
   document.querySelectorAll('[data-tab]').forEach(el=>{
@@ -973,6 +902,12 @@ function wireEvents(){
     el.addEventListener('change', ()=>{ S.setNote(el.dataset.person, 'note:'+el.dataset.note, el.value); });
   });
   // Celdas Gantt
+  document.querySelectorAll('[data-gantt-expand]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const proj = MASTER.find(p=>p.nombre===el.dataset.nombre);
+      if(proj) openGanttModal(proj);
+    });
+  });
   document.querySelectorAll('[data-notekey]').forEach(el=>{
     el.addEventListener('click', ()=>{
       openCellModal(el.dataset.slug, parseInt(el.dataset.week), el.dataset.phase, el.dataset.person, el.dataset.notekey);
