@@ -1,0 +1,36 @@
+name: Regenerar PM Estudio App
+
+on:
+  push:
+    paths:
+      - 'PM_ESTUDIO_MASTER_COMPLETO.xlsx'
+      - 'app.js'
+      - 'head.html'
+      - 'generate_app.py'
+  workflow_dispatch:  # permite lanzarlo manualmente desde GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install openpyxl
+
+      - name: Generar app HTML
+        run: python generate_app.py
+
+      - name: Publicar en GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          commit_message: "App actualizada automáticamente — ${{ github.event.head_commit.message }}"
