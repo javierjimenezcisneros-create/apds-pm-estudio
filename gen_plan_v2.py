@@ -286,324 +286,171 @@ def make_headers(dept_color):
     return r0, r1
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DATOS VIVIENDA — 7 sep 2026 (LIMPIO)
-# idx: 0=7SEP(HOY) 1=14SEP 2=21SEP 3=28SEP 4=5OCT 5=12OCT 6=19OCT 7=26OCT 8=2NOV 9=9NOV 10=16NOV
-# ══════════════════════════════════════════════════════════════════════════════
-r0, r1 = make_headers(GRANATE)
-data = [r0, r1]
-
-# ── REMATES / ENTREGA ─────────────────────────────────────────────────────────
-data.append(fase_sep("REMATES / ENTREGA"))
-data += [
-    prow("241","VALENCIA","Sara/Andrea",
-         ws("REMATES","REMATES","REMATES","REMATES"),
-         "Sep'26","SEGUIMIENTO",
-         nota="Remates en ejecución hasta fin sep. Solicitar planos producción. Terraza pdte cliente."),
-    prow("224","PEDRAZA","Olatz/Paula",
-         ws("REMATES","REMATES"),
-         "Oct'26","SEGUIMIENTO",
-         nota="Remates obra. Falta paisajismo y piscina. Fase 2: cuadras+casa jueces — planificar."),
-    prow("267","CAMINO SUR 70","Cristina/Nela",
-         ws("OBRA","REMATES","REMATES"),
-         "Oct'26","SEGUIMIENTO",
-         nota="Terminar vie+sáb luminarias. Semana que viene remates y cosas pendientes."),
-    prow("","ABUBILLA","Paula",
-         ws("REMATES","FIN OBRA"),
-         "Sep'26","SEGUIMIENTO",
-         nota="Terminar semana que viene. Sofá y cortinas."),
-]
-
-# ── FIN DE OBRA ───────────────────────────────────────────────────────────────
-data.append(fase_sep("FIN DE OBRA"))
-data += [
-    prow("223","ALCALÁ 58","Alicia/Javi",
-         ws("OBRA","OBRA","OBRA","FIN OBRA"),
-         "Sep'26","SEGUIMIENTO",
-         nota="Termina última semana septiembre. Fin del proyecto."),
-    prow("264","LA FLORIDA","Paula",
-         ws("OBRA","FIN OBRA","REMATES","REMATES"),
-         "Sep'26","SEGUIMIENTO",
-         nota="Mudanza clientes finales sep. Remates hasta fin de mes."),
-]
-
-# ── PROYECTO DECORACIÓN (antes que Obra) ──────────────────────────────────────
-data.append(fase_sep("PROYECTO DECORACIÓN"))
-data += [
-    prow("275","PASEO LAGOS 121","Olatz",
-         ws("REUNIÓN","PROY DECO","PROY DECO","PEDIDOS","PEDIDOS"),
-         "Ene'27","ATENCIÓN ALTA",
-         nota="⚠ Reunión viernes. HITO: deco cerrado sep · presupuesto sem 28sep · pedidos oct · entrega ene.",
-         alert=True),
-    prow("232","VIV PALOMA RD","Olatz/Andrea",
-         ws("PROY DECO","PROY DECO"),
-         "Jul'27","SEGUIMIENTO",
-         nota="Olatz con cambios clientes esta semana. Se compagina con obra. Reunión sep."),
-]
-
-# ── OBRA EN EJECUCIÓN ─────────────────────────────────────────────────────────
-data.append(fase_sep("OBRA EN EJECUCIÓN"))
-data += [
-    prow("254","LA RINCONADA","Cristina/Nela",
-         ws("OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","FIN OBRA","ENTREGA"),
-         "Nov'26","ATENCIÓN ALTA",
-         nota="Deco muy bien. Obra lenta — pedir planning. FIN OBRA finales oct. Entrega nov. ⚠ ¿Pedidos deco realizados?",
-         
-         alert=True),
-    prow("271","VIUDA DE ALDAMA 3","Nela/Andrea",
-         ws("","OBRA","OBRA","OBRA","OBRA","OBRA","PROY DECO","OBRA","OBRA","OBRA","OBRA"),
-         "26 feb'27","ATENCIÓN ALTA",
-         nota="⚠ HITO 19 oct: cerrar proy deco para fabricación. Montaje 11 ene. Parón nav. Entrega 26 feb.",
-         alert=True),
-    prow("268","MONTESQUINZA","Sara",
-         ws(),
-         "2027","ATENCIÓN ALTA",
-         nota="Parado por consulta urbanística especial. Sin fecha de reanudación.",
-         alert=True),
-    prow("265","PESQUERA","Paula",
-         ws("OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA"),
-         "Ene'27","SEGUIMIENTO",
-         nota="Proyecto obra entregado. Terminar enero. Constructora en marcha."),
-    prow("216","SANTANDER VIV","Sara",
-         ws("","VISITA","PROY DECO","PROY DECO","PEDIDOS","PEDIDOS","PEDIDOS","PEDIDOS"),
-         "Dic'26","ATENCIÓN ALTA",
-         nota="⚠ Retroplanning: deco cerrar oct · pedidos oct/nov · montaje dic. Organizar visita sem que viene."),
-    prow("242","IBIZA","Sara",
-         ws("","OBRA","PROY DECO","PROY DECO","PEDIDOS","PEDIDOS","PEDIDOS","PEDIDOS"),
-         "Dic'26","ATENCIÓN ALTA",
-         nota="⚠ Retroplanning: inicio 15 sep · deco desde oct · pedidos oct/nov · montaje dic. PM local planifica."),
-]
-
-# ── PROYECTO EJECUCIÓN / DECO + OBRA ─────────────────────────────────────────
-data.append(fase_sep("PROYECTO EJECUCIÓN / DECO"))
-data += [
-    prow("255","PASEO LAGOS 105","Sara/Andrea",
-         ws("","REUNIÓN","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E"),
-         "Ene'27(obra)","ATENCIÓN ALTA",
-         nota="Proyecto de ejecución. Reunión 15 sep. Andrea con renders. Deco arranca cuando empiece obra ene.",
-         alert=True),
-    prow("239","TORRE VALENCIA","Paula",
-         ws("","","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E"),
-         "2027","SEGUIMIENTO",
-         nota="Replanteo iluminación. Cliente sin decisiones domótica. Sin novedades."),
-]
-
-# ── RENDERS / PROYECTO BÁSICO ─────────────────────────────────────────────────
-data.append(fase_sep("RENDERS / PROYECTO BÁSICO"))
-data += [
-    prow("211","CAMINO SUR 35","Nela",
-         ws("RENDERS","RENDERS","RENDERS","RENDERS","RENDERS","RENDERS","RENDERS","RENDERS","RENDERS","RENDERS","RENDERS"),
-         "2027","SEGUIMIENTO",
-         nota="Esta semana: enviar calendario renders por zonas al cliente."),
-]
-
-# ── PENDIENTE / NUEVOS ────────────────────────────────────────────────────────
-data.append(fase_sep("PENDIENTE / NUEVOS"))
-data += [
-    prow("273","VIUDA DE ALDAMA 2","Sin asignar",
-         ws(),
-         "2027","SEGUIMIENTO",
-         nota="Organizar primera reunión primeros de octubre."),
-    prow("258","HERMOSILLA","Nela/Olatz",
-         ws(),
-         "Mar'27","SEGUIMIENTO",
-         nota="Cliente no contesta. Seguimiento activo. Tenía precio constructora."),
-    prow("262","TEPEYAC","Paula",
-         ws("REUNIÓN"),
-         "2027","SEGUIMIENTO",
-         nota="Reunión miércoles 10 sep con Raúl (online). Cerrar proyecto y organizar obra."),
-    prow("","ANTIC COLONIAL","Sin asignar",
-         ws(),
-         "2026","SEGUIMIENTO",
-         nota="Colaboración con marca azulejos. Ver con Sara en qué punto está."),
-    prow("","PORTAL DE FERRAZ 78","Sin asignar",
-         ws(),
-         "2026","SEGUIMIENTO",
-         nota="Reforma portal oficina. Sin novedades."),
-    prow("231","GAMAL STO. DOMINGO","Sofía/Olatz",
-         ws("","","ALEJANDRA"),
-         "—","SEGUIMIENTO",
-         nota="Obra terminada. Ale va lun 21 sep a revisar y ver nuevas obras. NUEVA OBRA: Gamal La Romana."),
-    prow("","GAMAL LA ROMANA","Sin asignar",
-         ws(),
-         "2027","SEGUIMIENTO",
-         nota="Nuevo proyecto. Ale abre puerta en visita 21 sep."),
-    prow("","CONDE ORGAZ","Sin asignar",
-         ws(),
-         "—","SEGUIMIENTO",
-         nota="Lead. Posible proyecto vivienda. Clientes van a llamar."),
-]
-
-# ── LATENTES ──────────────────────────────────────────────────────────────────
-data.append(latentes_sep())
-data += [
-    prow("225","ANA HONTANAR","Paula",ws(),"—","PARADO","Después de verano."),
-    prow("","HABITACIÓN ABI","Andrea",ws(),"—","PARADO","Pdte feedback presupuesto."),
-    prow("","MONTALBÁN","Olatz",ws(),"—","PARADO","—"),
-    prow("265","JAIME PESQUERA","Paula",ws(),"—","PARADO","Después de verano."),
-]
-
-gen_pdf(data, "/home/claude/planning_viv_9sep.pdf", GRANATE)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# RESTAURANTES — 7 sep 2026
+# LECTOR DE EXCEL — reemplaza los datos hardcodeados
 # ══════════════════════════════════════════════════════════════════════════════
-def hfn_rest(c,d): 
-    c.saveState()
-    c.setFillColor(colors.HexColor("#8B3A00"))
-    c.rect(0, H-14*mm, W, 14*mm, fill=1, stroke=0)
-    c.setFillColor(BLANCO); c.setFont("Helvetica-Bold",12)
-    c.drawString(8*mm, H-9*mm, "ALEJANDRA POMBO DESIGN STUDIO  ·  PLANNING RESTAURANTES")
-    c.setFont("Helvetica",8); c.setFillColor(colors.HexColor("#C26942"))
-    c.drawRightString(W-8*mm, H-9*mm, "9 septiembre 2026  ·  Actualizado reunión equipo")
-    c.setFillColor(NARANJA); c.rect(0, 0, W, 4*mm, fill=1, stroke=0)
-    c.setFillColor(BLANCO); c.setFont("Helvetica",5.5)
-    c.drawString(8*mm, 1.5*mm, "Planning interno · No distribuir")
-    c.drawRightString(W-8*mm, 1.5*mm, "APDS · RESTAURANTES · 09/09/2026")
-    c.restoreState()
+import urllib.request, openpyxl, io, sys, os
+from datetime import date
 
-DEPT_REST = colors.HexColor("#8B3A00")
-r0r,r1r = make_headers(DEPT_REST)
-data_r = [r0r, r1r]
+REPO  = "javierjimenezcisneros-create/apds-pm-estudio"
+EXCEL = "PM_ESTUDIO_MASTER_COMPLETO.xlsx"
 
-data_r.append(fase_sep("REMATES / ENTREGA"))
-data_r += [
-    prow("252","FOX + LA DESPENSA","Sofía/Naiara",
-         ws("REMATES","FIN OBRA"),
-         "Sep'26","SEGUIMIENTO","Remates hasta semana que viene. La Despensa stand-by."),
-]
+def download_excel():
+    """Descarga el Excel de GitHub."""
+    url = f"https://raw.githubusercontent.com/{REPO}/main/{EXCEL}"
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            data = r.read()
+        print(f"✅ Excel descargado ({len(data)//1024}KB)")
+        return openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+    except Exception as e:
+        # Fallback: buscar archivo local
+        if os.path.exists(EXCEL):
+            print(f"⚠ Sin internet — usando {EXCEL} local")
+            return openpyxl.load_workbook(EXCEL, data_only=True)
+        print(f"❌ No se puede cargar el Excel: {e}")
+        sys.exit(1)
 
-data_r.append(fase_sep("OBRA EN EJECUCIÓN"))
-data_r += [
-    # Cobue: apertura 21 ene → pedidos deben estar ahora (retroplanning 3 meses)
-    prow("272","COBUE","Sofía/Naiara",
-         ws("PEDIDOS","PEDIDOS","PEDIDOS","PEDIDOS","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA"),
-         "21 ene","ATENCIÓN ALTA","Licitando. Apertura 21 ene. ⚠ PEDIDOS ya. Proyecto terminado. Ideas terraza enviadas."),
-    # Mallorca: quieren terminar dic → retroplanning: pedidos oct/nov
-    prow("257","MALLORCA SEVILLA","Sofía/Naiara",
-         ws("OBRA","OBRA","OBRA","OBRA","PEDIDOS","PEDIDOS","PEDIDOS","OBRA","OBRA","OBRA","OBRA"),
-         "Dic'26","ATENCIÓN ALTA","Demolición ejecutada. Quieren terminar diciembre."),
-    # Puerto Rico: apertura mar → pedidos ene/feb → producción oct
-    prow("222","PUERTO RICO","Sofía",
-         ws("","VISITA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA"),
-         "Mar'27","ATENCIÓN ALTA","Visita+mediciones sem 19 sep. Cerrar carpintero → producir oct. Abrir marzo.",alert=True),
-]
+def excel_to_data(ws, dept_color, fname):
+    """
+    Convierte una hoja de planning del Excel en la lista data[] para gen_pdf().
+    Estructura de la hoja:
+      Fila 1: cabecera dept
+      Fila 2: cabecera meses
+      Fila 3: Nº | PROYECTO | EQUIPO | NOTAS | FIN EST | RIESGO | sem1 | sem2 ...
+      Fila 4+: datos
+    """
+    rows = list(ws.iter_rows(values_only=True))
 
-data_r.append(fase_sep("PROYECTO EJECUCIÓN"))
-data_r += [
-    prow("217","PASEO LAGOS 132","Sofía/Naiara",
-         ws("PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E"),
-         "May'27","SEGUIMIENTO","Calendario entregas renders — reunión semanal."),
+    # ── Detectar fila cabecera y semanas ─────────────────────────────────────
+    header_idx = None
+    week_cols  = {}   # col_index(0-based) → week_label
 
-    prow("276","RUBAIYAT SÃO PAULO","Naiara",
-         ws("ANT.PROY","ANT.PROY","ANT.PROY","REVISIÓN","VIAJE"),
-         "Feb'27","ATENCIÓN ALTA","Preparar anteproyecto. Revisión ~22 sep. Viaje 29 sep (2 noches). Obra enero."),
-]
+    for i, row in enumerate(rows):
+        if len(row) > 1 and str(row[1] or '').strip() == 'PROYECTO':
+            header_idx = i
+            for j in range(6, len(row)):
+                v = row[j]
+                if v and isinstance(v, str) and any(c.isdigit() for c in str(v)):
+                    week_cols[j] = str(v).strip()
+            break
 
-data_r.append(fase_sep("REUNIÓN / SEGUIMIENTO"))
-data_r += [
-    prow("243","RUBAIYAT MADRID","Naiara",
-         ws("REUNIÓN"),
-         "Sep'26","SEGUIMIENTO","Reunión jue 11 sep. Quieren retomar terraza."),
-]
+    if header_idx is None:
+        print(f"   ⚠ No se encontró cabecera en {ws.title}")
+        return None
 
-data_r.append(fase_sep("PENDIENTE DE CLIENTE / LICENCIA"))
-data_r += [
-    prow("172","HIPÓDROMO","Sofía/Naiara",ws(),"Pdte","SEGUIMIENTO","Sin noticias. Pendiente hablar con María PM."),
-    prow("","CONCURSO DISCESUR","Sin asignar",
-         ws("","","","ENTREGA","ENTREGA"),
-         "Oct'26","ATENCIÓN ALTA","Diseñar creatividad en azulejo para exposición. Deadline finales octubre."),
-]
+    # ── Mapear etiquetas de semana del Excel a índices de WEEKS ──────────────
+    week_label_to_idx = {sem: i for i,(mes,sem) in enumerate(WEEKS)}
 
-data_r.append(latentes_sep())
-data_r += [
-    prow("","SANTANDER REST","Admón.",ws(),"—","PARADO","Gestión interna cobro."),
-    prow("270","JOANN DOMINICANA","Sofía",ws(),"—","PARADO","Pendiente entrar."),
-    prow("","SOPHIE","Sofía",ws(),"—","PARADO","Pendiente aceptación."),
-]
+    # ── Actualizar WEEKS desde el Excel si son distintas ─────────────────────
+    # (Tomamos las semanas reales del Excel para que PDF y Excel estén sincronizados)
+    excel_week_labels = [v for _,v in sorted(week_cols.items())]
 
-gen_pdf(data_r, "/home/claude/planning_rest_9sep.pdf", DEPT_REST)
+    # ── Construir data[] ──────────────────────────────────────────────────────
+    r0, r1 = make_headers(dept_color)
+    data = [r0, r1]
+    
+    last_sep = None
+
+    for row in rows[header_idx + 1:]:
+        if not row: continue
+
+        col0 = str(row[0] or '').strip()  # Nº
+        col1 = str(row[1] or '').strip()  # PROYECTO / separador
+        col2 = str(row[2] or '').strip()  # EQUIPO
+        col3 = str(row[3] or '').strip()  # NOTAS
+        col4 = str(row[4] or '').strip()  # FIN EST
+        col5 = str(row[5] or '').strip()  # RIESGO
+
+        if not col1 and not col0: continue
+
+        # ── Separador de fase ─────────────────────────────────────────────────
+        if col2 and col2.isupper() and not col0 and not col5:
+            data.append(fase_sep(col2.strip()))
+            last_sep = col2
+            continue
+
+        # ── Fila de vacaciones ────────────────────────────────────────────────
+        if '🏖' in col1 or 'VACACIONES' in col1.upper():
+            vac_data = {}
+            for j, wlabel in week_cols.items():
+                if j < len(row) and row[j]:
+                    idx = week_label_to_idx.get(wlabel, -1)
+                    if idx >= 0:
+                        vac_data[idx] = str(row[j]).strip()
+            # Añadir fila vac inline
+            vr = [p("🏖",7,True,BLANCO,TA_CENTER), p(""),
+                  p("VACACIONES",6.5,True,BLANCO), p("")]
+            for i,(mes,sem) in enumerate(WEEKS):
+                txt = vac_data.get(i,'')
+                vr.append(p(txt, 7, False, BLANCO, TA_CENTER))
+            vr += [p(""), p(""), p("")]
+            data.append(vr)
+            continue
+
+        # ── Separador latentes ────────────────────────────────────────────────
+        if 'LATENTE' in col2.upper() or 'PAUSADO' in col2.upper():
+            data.append(latentes_sep())
+            continue
+
+        # ── Fila de proyecto ──────────────────────────────────────────────────
+        if not col1 or len(col1) < 2: continue
+
+        # Construir semanas[]
+        semanas_list = [''] * N
+        for j, wlabel in week_cols.items():
+            if j < len(row) and row[j]:
+                v = str(row[j]).strip()
+                if v not in ('None', '', '—'):
+                    idx = week_label_to_idx.get(wlabel, -1)
+                    if 0 <= idx < N:
+                        semanas_list[idx] = v
+
+        alert = '⚠' in col3 or col5 in ('ATENCIÓN MÁXIMA',)
+
+        data.append(prow(
+            num     = col0,
+            nombre  = col1,
+            equipo  = col2,
+            semanas = semanas_list,
+            fin_est = col4,
+            riesgo  = col5 if col5 else 'SEGUIMIENTO',
+            nota    = col3,
+            alert   = alert,
+        ))
+
+    return data
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HOTELES — 7 sep 2026
+# MAIN — descargar Excel y generar los 3 PDFs
 # ══════════════════════════════════════════════════════════════════════════════
-def hfn_hot(c,d):
-    c.saveState()
-    c.setFillColor(colors.HexColor("#1A3A5C"))
-    c.rect(0, H-14*mm, W, 14*mm, fill=1, stroke=0)
-    c.setFillColor(BLANCO); c.setFont("Helvetica-Bold",12)
-    c.drawString(8*mm, H-9*mm, "ALEJANDRA POMBO DESIGN STUDIO  ·  PLANNING HOTELES")
-    c.setFont("Helvetica",8); c.setFillColor(colors.HexColor("#C26942"))
-    c.drawRightString(W-8*mm, H-9*mm, "9 septiembre 2026  ·  Actualizado reunión equipo")
-    c.setFillColor(NARANJA); c.rect(0, 0, W, 4*mm, fill=1, stroke=0)
-    c.setFillColor(BLANCO); c.setFont("Helvetica",5.5)
-    c.drawString(8*mm, 1.5*mm, "Planning interno · No distribuir")
-    c.drawRightString(W-8*mm, 1.5*mm, "APDS · HOTELES · 09/09/2026")
-    c.restoreState()
+if __name__ == '__main__':
+    today  = date.today()
+    suffix = today.strftime('%d%b').lower()   # p.ej. "09sep"
 
-DEPT_HOT = colors.HexColor("#1A3A5C")
-r0h,r1h = make_headers(DEPT_HOT)
-data_h = [r0h, r1h]
+    print(f"\n🗓  {today.strftime('%d de %B de %Y')}")
+    wb = download_excel()
 
-data_h.append(fase_sep("ENTREGA / CIERRE"))
-data_h += [
-    prow("229","VÍA 66","Jesús",
-         ws("ENTREGA","PROY E","PROY E","PROY E"),
-         "Ene'27","ATENCIÓN ALTA","Entrega esta semana (incompleta). ⚠ Muebles adaptación por habitación. ZZCC fase 2 enero.",alert=True),
-    prow("259","CASA CORREOS","Jesús",
-         ws("PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","FIN OBRA"),
-         "3 nov'26","ATENCIÓN ALTA","Entrega final pdte. PE deadline 3 nov. Patrimonio primero (2-3 sem). Pdte visado COAM.",alert=True),
-]
+    DEPT_VIV  = GRANATE
+    DEPT_REST = colors.HexColor("#8B3A00")
+    DEPT_HOT  = colors.HexColor("#1A3A5C")
 
-data_h.append(fase_sep("MONTAJE / OBRA"))
-data_h += [
-    # One Shot: montaje 21 sep proveedor, fin oct → Ale ppios oct
-    prow("185","ONE SHOT BILBAO","Marta",
-         ws("PROY E","MONTAJE","MONTAJE","MONTAJE","ALEJANDRA"),
-         "Oct'26","ATENCIÓN ALTA","Montaje proveedor 21 sep. Fin octubre. ⚠ Ale debería ir ppios octubre.",alert=True),
-]
+    sheets = [
+        ('VIVIENDA',      DEPT_VIV,  f"/home/claude/planning_viv_{suffix}.pdf"),
+        ('RESTAURANTES',  DEPT_REST, f"/home/claude/planning_rest_{suffix}.pdf"),
+        ('HOTELES',       DEPT_HOT,  f"/home/claude/planning_hot_{suffix}.pdf"),
+    ]
 
-data_h.append(fase_sep("PROYECTO EJECUCIÓN"))
-data_h += [
-    prow("274","PSN PORTAL","Jesús",
-         ws("PROY E","ENTREGA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA"),
-         "Nov'26","ATENCIÓN ALTA","Cliente pendiente de ver proyecto. Entrega sep. Valoración Raúl fin sep. Obra 1 nov."),
-    # Casa Almagro: anteproyecto urgente → obra nov/dic
-    prow("","CASA ALMAGRO","Jesús/Marta",
-         ws("ANT.PROY","ANT.PROY","ANT.PROY","ANT.PROY","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA","OBRA"),
-         "Feb'27","ATENCIÓN ALTA","⚠ ANT.PROY cuanto antes. Ver si vamos bien con ideas cliente. Obra nov/dic. 200k€.",alert=True),
-    # Roca Maya: presentación 23 sep, FIN OBRA Sem Santa
-    prow("249","ROCA MAYA","Marta/Jesús",
-         ws("PROY E","PROY E","REUNIÓN","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E"),
-         "Sem Santa","SEGUIMIENTO","Presentación hab. piloto 23 sep (Marta+Jesús viajan). FIN OBRA Sem Santa."),
-    prow("250","RESTAURANTE HOTEL GAVÀ","Marta",
-         ws("PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E","PROY E"),
-         "Feb'28","SEGUIMIENTO","Restaurante hotel Barcelona. PEID F&B en curso. Constructora EC2: 15 dic. Entrega 28 feb 2028."),
-]
+    for sheet_name, dept_color, fname in sheets:
+        if sheet_name not in wb.sheetnames:
+            print(f"⚠ Hoja {sheet_name} no encontrada en el Excel")
+            continue
+        ws = wb[sheet_name]
+        data = excel_to_data(ws, dept_color, fname)
+        if data and len(data) > 2:
+            gen_pdf(data, fname, dept_color)
+        else:
+            print(f"⚠ Sin datos en {sheet_name}")
 
-data_h.append(fase_sep("SUPERVISIÓN / SEGUIMIENTO PUNTUAL"))
-data_h += [
-    prow("235","AYALA OFICINAS","Ale/Jesús",ws(),"Dic'26","ESTABLE","Seguimiento obra. Presu deco entregado. Montaje diciembre."),
-    prow("260","GONZALO CÓRDOBA","Jesús",ws(),"Continuo","ESTABLE","Consultas puntuales."),
-    prow("246","KANDA SÁNCHEZ PACHECO","Jesús/Marta",ws(),"—","ESTABLE","Sin noticias."),
-    prow("245","KANDA CATALINA SUÁREZ","Jesús/Marta",ws(),"—","ESTABLE","Sin noticias."),
-]
-
-data_h.append(fase_sep("PENDIENTE DE CLIENTE / REACTIVANDO"))
-data_h += [
-    prow("212","HOTEL SEVILLA","Marta",
-         ws("","REUNIÓN"),
-         "2027","SEGUIMIENTO","Se reactiva. Martes 15 sep viene cliente principal. Marcar reunión para planificar."),
-    prow("","BLESS","—",
-         ws("PEDIDOS"),
-         "—","SEGUIMIENTO","Poner en marcha unos sofás. Encargo puntual."),
-    prow("253","HOTEL GIJÓN","Marta/Jesús",ws(),"—","SEGUIMIENTO","Arquitectos revisando. Habrá problemas arquitectura — pendiente planos."),
-    prow("109","VINCCI VALENCIA","Marta/Jesús",ws(),"Jul'27","SEGUIMIENTO","Piloto enero 2027. Montaje final julio 2027."),
-]
-
-data_h.append(latentes_sep())
-data_h += [
-    prow("","PANTANO RURAL","—",ws(),"—","PARADO","—"),
-    prow("06","4 MASOS","—",ws(),"—","PARADO","—"),
-]
-
-gen_pdf(data_h, "/home/claude/planning_hot_9sep.pdf", DEPT_HOT)
+    print("\n✅ Plannings generados desde Excel")
