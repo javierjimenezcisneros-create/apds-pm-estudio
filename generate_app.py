@@ -33,20 +33,23 @@ SHEET_PLANNING_KEY = "PLANNING"
 
 # Columnas esperadas en MASTER GLOBAL (cabeceras, case-insensitive strip)
 COL_MASTER = {
-    "proyecto":      "PROYECTO",
-    "dpto":          "DPTO",
-    "equipo":        "EQUIPO",
-    "estado":        "ESTADO",
-    "proximo_hito":  "PRÓXIMO HITO",
-    "fecha_hito":    "FECHA PRÓXIMO HITO",
-    "bloqueador":    "BLOQUEADOR",
-    "constructora":  "CONSTRUCTORA",
-    "fase":          "FASE",
-    "atencion":      "ATENCIÓN",
-    "fin_obra":      "FIN OBRA PREVISTO",
-    "montaje":       "MONTAJE PREVISTO",
-    "fin_oficial":   "FINALIZACIÓN OFICIAL",
-    "obs":           "OBSERVACIONES",
+    "proyecto":                    "PROYECTO",
+    "dpto":                        "DPTO",
+    "equipo":                      "EQUIPO",
+    "estado":                      "ESTADO",
+    "proximo_hito":                "PRÓXIMO HITO",
+    "fecha_hito":                  "FECHA PRÓXIMO HITO",
+    "bloqueador":                  "BLOQUEADOR",
+    "constructora":                "CONSTRUCTORA",
+    "fase":                        "FASE",
+    "atencion":                    "ATENCIÓN",
+    "fin_obra":                    "FIN OBRA PREVISTO",
+    "montaje":                     "MONTAJE PREVISTO",
+    "fin_oficial":                 "FINALIZACIÓN OFICIAL",
+    "obs":                         "OBSERVACIONES",
+    "deco_cerrada":                "DECO CERRADA",
+    "presupuesto_deco_aceptado":   "PRESUPUESTO DECO ACEPTADO",
+    "pedidos_confirmados":         "PEDIDOS CONFIRMADOS",
 }
 
 # Valores válidos de ATENCIÓN (normalizados)
@@ -244,6 +247,8 @@ def leer_master(ws) -> tuple[list, list]:
             atencion = None  # no almacenamos valores inválidos
 
         # --- MASTER_DATA ---
+        # Campos deco: se almacenan exactamente como vienen del Excel ("SÍ" / "NO" / None).
+        # No se convierten a booleanos para preservar el estado real sin inferencias.
         master_entry = {
             "id":          proyecto_id,
             "nombre":      nombre,
@@ -256,6 +261,9 @@ def leer_master(ws) -> tuple[list, list]:
             "montaje":     val(get("montaje")),   # string original ('05/10 – 16/10')
             "fin_oficial": parse_fecha(get("fin_oficial")),
             "obs":         val(get("obs")),
+            "deco_cerrada":              val(get("deco_cerrada")),
+            "presupuesto_deco_aceptado": val(get("presupuesto_deco_aceptado")),
+            "pedidos_confirmados":       val(get("pedidos_confirmados")),
             "ficha_url":   None,
         }
         master_data.append(master_entry)
