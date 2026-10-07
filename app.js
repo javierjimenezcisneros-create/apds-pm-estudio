@@ -1,700 +1,733 @@
+/* ============================================================
+   POMBO ESTUDIO — app.js
+   Trabaja exclusivamente con MASTER_DATA, GLOBAL_DATA, PLANNING_DATA, META
+   Todos los datos inyectados por generate_app.py
+   ============================================================ */
 
-
-
-
-
-
-let curPerson = 'javi';
-let filterDept = 'todos', filterRisk = 'todos', filterSearch = '';
-
-
-// APDS PM Estudio — Lógica de la app
-
-// ── HELPERS ──────────────────────────────────────────────────────────────────
-function deptCls(d){
-  d=(d||'').toLowerCase();
-  if(d.includes('vivienda')) return 'tag-viv';
-  if(d.includes('hotel')) return 'tag-hot';
-  if(d.includes('restaurante')||d.includes('rest')) return 'tag-rest';
-  return 'tag-out';
-}
-function riskCls(r){
-  r=(r||'').toUpperCase();
-  if(r.includes('CRITICO')||r.includes('CRÍTICO')||r.includes('MUY ALTO')) return 'tag-crit';
-  if(r==='ALTO') return 'tag-alto';
-  if(r==='MEDIO') return 'tag-med';
-  if(r==='BAJO') return 'tag-baj';
-  if(r.includes('VACACIONES')) return 'tag-vac';
-  return 'tag-out';
-}
-function riskLbl(r){
-  r=(r||'').toUpperCase();
-  if(r.includes('CRITICO')||r.includes('CRÍTICO')||r.includes('MUY ALTO')) return 'Crítico';
-  if(r==='ALTO') return 'Alto';
-  if(r==='MEDIO') return 'Medio';
-  if(r==='BAJO') return 'Bajo';
-  if(r.includes('VACACIONES')) return 'Vacaciones';
-  return r;
-}
-function phaseCls(p){
-  if(!p) return '';
-  const up = p.toUpperCase();
-  if(up.includes('PROYECTO')||up.includes('ANTEPROYECTO')||up.includes('PROY')||up.includes('BASICO')||up.includes('PRESUPUESTO')||up.includes('VALORACION')||up.includes('FEEDBACK')||up.includes('RENDER')||up.includes('REUNION')||up.includes('REUNIÓN')||up.includes('IDEAS')||up.includes('MARKETING')||up.includes('EMPEZAR')) return 'ph1';
-  if(up.includes('OBRA')||up.includes('EJECUCION')||up.includes('INICIO')||up.includes('EMPIEZA')||up.includes('OBRA DE NUEVO')) return 'ph2';
-  if(up.includes('PEDIDO')||up.includes('CARPINTER')||up.includes('CERRAR DECO')||up.includes('TECHOS')||up.includes('REVISAR EQUIPAMIENTO')) return 'ph3';
-  if(up.includes('MONTAJE')||up.includes('VISITA')) return 'ph4';
-  if(up.includes('ENTREGA')||up.includes('FIN OBRA')||up.includes('CIERRE')||up.includes('TERMINAD')) return 'ph6';
-  if(up.includes('RENDERS')||up.includes('DECO')) return 'ph7';
-  if(up.includes('PARADO')||up.includes('PENDIENTE')||up.includes('LICENCIA')||up.includes('REPLANTEO')) return 'ph9';
-  return 'ph5';
-}
-function phaseShort(p){
-  if(!p) return '';
-  const up = p.toUpperCase();
-  if(up.includes('MONTAJE')) return 'MONT';
-  if(up.includes('ANTEPROYECTO')) return 'ANT';
-  if(up.includes('PROY BASICO')||up.includes('PROYECTO BASICO')) return 'PB';
-  if(up.includes('PROYECTO')||up.includes('PROY')) return 'PROY';
-  if(up.includes('PRESUPUESTO')||up.includes('PRESU')) return 'PRES';
-  if(up.includes('VALORACION')||up.includes('VALORACIÓN')) return 'VAL';
-  if(up.includes('OBRA')) return 'OBRA';
-  if(up.includes('PEDIDO')) return 'PED';
-  if(up.includes('CARPINTER')) return 'CARP';
-  if(up.includes('REUNIÓN')||up.includes('REUNION')) return 'REUN';
-  if(up.includes('ENTREGA')) return 'ENT';
-  if(up.includes('RENDERS')||up.includes('RENDER')) return 'REND';
-  if(up.includes('DECO')&&!up.includes('INICIO')) return 'DECO';
-  if(up.includes('VISITA')) return 'VIS';
-  if(up.includes('FIN OBRA')) return 'FIN';
-  if(up.includes('CIERRE')||up.includes('CERRAR')) return 'CIE';
-  if(up.includes('PARADO')) return '—';
-  if(up.includes('PENDIENTE')) return 'PEN';
-  if(up.includes('LICENCIA')) return 'LIC';
-  if(up.includes('FEEDBACK')) return 'FB';
-  if(up.includes('EMPEZAR')||up.includes('EMPIEZA')) return 'INI';
-  if(up.includes('REPLANTEO')) return 'REP';
-  if(up.includes('ALEJANDRA')) return 'ALE';
-  if(up.includes('FUERA')) return 'FUERA';
-  return p.slice(0,4).toUpperCase();
-}
-
-// ── STORAGE ──────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────
+   ESTADO LOCAL (localStorage)
+   Checkboxes y notas por persona/proyecto
+   ────────────────────────────────────────────── */
 const S = {
-  _c: {},
-  load(id){
-    if(this._c[id]) return this._c[id];
-    let v = {check:{}, notes:{}};
-    try{ const ls = localStorage.getItem('apds:'+id); if(ls) v=JSON.parse(ls); }catch(e){}
-    this._c[id] = v; return v;
+  key: (pid, field) => `pombo_${pid}_${field}`,
+  get: (pid, field, def = '') => {
+    try { return localStorage.getItem(S.key(pid, field)) ?? def; }
+    catch { return def; }
   },
-  save(id){
-    try{ localStorage.setItem('apds:'+id, JSON.stringify(this._c[id])); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); }
+  set: (pid, field, val) => {
+    try { localStorage.setItem(S.key(pid, field), val); }
+    catch {}
   },
-  setCheck(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].check[k]=v; this.save(id); },
-  setNote(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].notes[k]=v; this.save(id); },
+  toggle: (pid, field) => {
+    const v = S.get(pid, field, '0') === '1' ? '0' : '1';
+    S.set(pid, field, v);
+    return v === '1';
+  }
 };
 
-function setSyncStatus(s){
-  const el=document.getElementById('sync'); if(!el) return;
-  el.className='sync '+(s==='saving'?'saving':s==='error'?'error':'');
-  const dot=el.querySelector('.sync-dot'); if(dot) dot.className='sync-dot';
-  el.innerHTML=`<span class="sync-dot"></span>${s==='saving'?'Guardando…':s==='error'?'Sin conexión':'Sincronizado'}`;
+/* ──────────────────────────────────────────────
+   CRUCE DE DATOS: indexar GLOBAL y PLANNING por id
+   ────────────────────────────────────────────── */
+let _globalIdx = null;
+let _planIdx   = null;
+
+function buildIndexes() {
+  _globalIdx = {};
+  (GLOBAL_DATA || []).forEach(g => { _globalIdx[g.id] = g; });
+
+  _planIdx = {};
+  ((PLANNING_DATA || {}).proyectos || []).forEach(p => { _planIdx[p.id] = p; });
 }
 
-// ── GANTT ──────────────────────────────────────────────────────────────────
-function renderGantt(proj, personId){
-  const tl = proj.tl || {};
-  const slug = proj.slug || proj.nombre.replace(/\s+/g,'_').toLowerCase();
-  const state = S._c[personId] || {check:{}, notes:{}};
+function globalOf(id) { return _globalIdx?.[id] || null; }
+function planOf(id)   { return _planIdx?.[id]   || null; }
 
-  // Cabecera meses
-  let monthsHtml = '';
-  MONTHS.forEach(([m, start, end]) => {
-    const span = end - start + 1;
-    monthsHtml += `<div class="gantt-month" style="grid-column:span ${span}">${m}</div>`;
-  });
-  // rellenar hasta 20
-  const filled = MONTHS.reduce((a,[,s,e])=>a+(e-s+1),0);
-  if(filled < 20) monthsHtml += `<div class="gantt-month" style="grid-column:span ${20-filled}"></div>`;
-
-  // Celdas
-  let cells = '';
-  const phases = Array.from({length:20},(_,i)=>tl[i]||null);
-  for(let i=0;i<20;i++){
-    const ph = phases[i];
-    const nextPh = phases[i+1];
-    const cls = ph ? `gantt-cell filled ${phaseCls(ph)}` : 'gantt-cell';
-    const noteKey = `cn:${slug}:${i}`;
-    const hasNote = !!(state.notes && state.notes[noteKey]);
-    const arrow = ph && nextPh && phaseCls(ph) !== phaseCls(nextPh) ? '<span class="gantt-arrow"></span>' : '';
-    const lbl = ph ? `<span class="gantt-label">${phaseShort(ph)}</span>` : '';
-    const noteClass = hasNote ? ' has-note' : '';
-    cells += ph
-      ? `<div class="${cls}${noteClass}" title="${ph} · sem ${WEEK_LABELS[i]}" data-slug="${slug}" data-week="${i}" data-phase="${ph}" data-person="${personId}" data-notekey="${noteKey}">${lbl}${arrow}</div>`
-      : `<div class="${cls}" title="Sem ${WEEK_LABELS[i]}"></div>`;
-  }
-
-  // Weeks
-  const weeksHtml = WEEK_LABELS.map(w=>`<div class="gantt-week">${w}</div>`).join('');
-  const todayPct = (TODAY_WEEK / 20 * 100).toFixed(2);
-
-  return `<div class="gantt">
-    <div class="gantt-months" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-bottom:3px;">${monthsHtml}</div>
-    <div class="gantt-row" data-gantt-expand data-nombre="${proj.nombre.replace(/"/g,'&quot;')}" style="cursor:pointer;" title="Clic para ver planificación completa">
-      <div class="gantt-today" style="left:${todayPct}%"></div>
-      <div class="gantt-today-lbl" style="left:calc(${todayPct}% + 3px)">HOY</div>
-      <div class="gantt-grid">${cells}</div>
-      <div style="text-align:right;font-size:9px;color:var(--cop);margin-top:2px;letter-spacing:.06em;">↗ Ver planificación completa</div>
-    </div>
-    <div class="gantt-weeks" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-top:2px;">${weeksHtml}</div>
-  </div>`;
-}
-
-// ── MODAL NOTA DE CELDA ────────────────────────────────────────────────────
-function openCellModal(slug, weekIdx, phase, personId, noteKey){
-  const state = S._c[personId] || {check:{},notes:{}};
-  const existing = state.notes?.[noteKey] || '';
-  const weekLbl = WEEK_LABELS[weekIdx] || weekIdx;
-
-  const bd = document.createElement('div');
-  bd.className = 'modal-bg'; bd.id = 'cell-modal-bg';
-  bd.innerHTML = `<div class="modal">
-    <div class="modal-head">
-      <div><div class="modal-title">${slug.replace(/_/g,' ').toUpperCase()} · ${weekLbl}</div><div class="modal-sub">${phase}</div></div>
-      <button class="modal-close" id="m-close">×</button>
-    </div>
-    <div class="modal-body"><textarea id="m-ta" placeholder="Comentario para esta semana…">${existing}</textarea></div>
-    <div class="modal-foot">
-      ${existing?'<button class="btn-danger left" id="m-del">Borrar</button>':''}
-      <button class="btn-ghost" id="m-cancel">Cancelar</button>
-      <button class="btn-cop" id="m-save">Guardar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(bd);
-  bd.addEventListener('click', e=>{ if(e.target===bd) closeCellModal(); });
-  document.getElementById('m-close').onclick = closeCellModal;
-  document.getElementById('m-cancel').onclick = closeCellModal;
-  document.getElementById('m-save').onclick = ()=>{
-    const v = document.getElementById('m-ta').value.trim();
-    S.setNote(personId, noteKey, v);
-    const cell = document.querySelector(`[data-notekey="${noteKey}"]`);
-    if(cell){ v ? cell.classList.add('has-note') : cell.classList.remove('has-note'); }
-    closeCellModal();
+/* Enriquece un proyecto MASTER con datos de GLOBAL y PLANNING */
+function enrich(proj) {
+  return {
+    ...proj,
+    _global:   globalOf(proj.id),
+    _plan:     planOf(proj.id),
   };
-  const delBtn = document.getElementById('m-del');
-  if(delBtn) delBtn.onclick = ()=>{
-    S.setNote(personId, noteKey, '');
-    const cell = document.querySelector(`[data-notekey="${noteKey}"]`);
-    if(cell) cell.classList.remove('has-note');
-    closeCellModal();
-  };
-  document.getElementById('m-ta').focus();
-}
-function closeCellModal(){ const el=document.getElementById('cell-modal-bg'); if(el) el.remove(); }
-
-// ── COMPONENTES ──────────────────────────────────────────────────────────────
-function tagDept(d){
-  const cls=deptCls(d), lbl=d||'Todos';
-  return `<span class="tag ${cls}"><span class="dot"></span>${lbl}</span>`;
-}
-function tagRisk(r){
-  return `<span class="tag ${riskCls(r)}"><span class="dot"></span>${riskLbl(r)}</span>`;
-}
-function alertRow(a){
-  return `<div style="display:flex;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:6px;align-items:flex-start;">
-    <span style="flex-shrink:0;margin-top:2px;">${tagRisk(a.risk)}</span>
-    <div style="flex:1;min-width:0;">
-      <span style="font-weight:600;font-size:13px;">${a.proj}</span>
-      <span style="font-size:11px;color:var(--ink3);margin-left:6px;">${a.dept} · ${a.resp}</span>
-      <div style="font-size:13px;color:var(--ink2);margin-top:2px;">${a.text}</div>
-    </div>
-    <div style="font-size:11px;color:var(--ink3);white-space:nowrap;flex-shrink:0;padding-top:2px;">${a.fecha}</div>
-  </div>`;
 }
 
-function projCard(proj, personId){
-  const state = S._c[personId] || {check:{},notes:{}};
-  const slug = proj.slug || (proj.nombre||'').replace(/\s+/g,'_').toLowerCase();
-  const note = state.notes?.['note:'+slug] || '';
-  const hasTl = proj.tl && Object.keys(proj.tl).length > 0;
-  return `<div class="proj-card">
-    <div class="proj-top">
-      <div class="proj-name">${proj.nombre||proj.nombre}</div>
-      <div class="proj-tags">
-        ${proj.dept ? tagDept(proj.dept) : ''}
-        ${proj.riesgo||proj.intensidad ? tagRisk(proj.riesgo||proj.intensidad) : ''}
-        ${proj.estado ? `<span class="tag tag-out">${proj.estado}</span>` : ''}
-      </div>
-    </div>
-    ${proj.hito ? `<div class="hito-row"><span class="hito-text">${proj.hito}</span></div>` : ''}
-    ${proj.obs ? `<div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">${proj.obs}</div>` : ''}
-    ${proj.resp ? `<div class="proj-meta"><span class="k">Equipo</span><span>${proj.resp}</span></div>` : ''}
-    ${hasTl ? renderGantt({...proj, slug}, personId) : ''}
-    <div class="note-area" style="margin-top:${hasTl?'10px':'8px'}">
-      <label>Nota del equipo</label>
-      <textarea data-note="${slug}" data-person="${personId}" placeholder="Añadir nota…">${note}</textarea>
-    </div>
-  </div>`;
+/* ──────────────────────────────────────────────
+   SEMANA ACTUAL
+   ────────────────────────────────────────────── */
+function hoySemana() {
+  return META?.hoy_semana || '';
 }
 
-function focusItem(text, id, personId){
-  const state = S._c[personId] || {check:{},notes:{}};
-  const done = !!(state.check?.[id]);
-  return `<div class="focus-item${done?' done':''}">
-    <input type="checkbox" data-check="${id}" data-person="${personId}" ${done?'checked':''}>
-    <span class="focus-text">${text}</span>
-  </div>`;
+/* Índice de una semana en PLANNING_DATA.semanas */
+function semanaIdx(semana) {
+  return (PLANNING_DATA?.semanas || []).indexOf(semana);
 }
 
-curPerson = 'javi';
-filterDept = 'todos', filterRisk = 'todos', filterSearch = '';
+/* ──────────────────────────────────────────────
+   CARGA POR PERSONA (calculada en APP)
+   Cuenta proyectos activos de una persona en la semana actual
+   ────────────────────────────────────────────── */
+function cargaPersona(nombre) {
+  const hoy = hoySemana();
+  return (MASTER_DATA || []).filter(p => {
+    if (!(p.equipo || []).includes(nombre)) return false;
+    const plan = planOf(p.id);
+    if (!plan) return false;
+    return plan.timeline.some(t => t.semana === hoy);
+  }).length;
+}
 
-function renderMaster(){
-  const st=S._c['javi']||{check:{},notes:{}};
-  let h='';
-
-  h+=`<div class="view-head">
-    <div><div class="view-title">Javi · Master</div><div class="view-sub">${WEEK_LABEL}</div></div>
-    <div class="view-tags">${tagDept('Vivienda')}${tagDept('Hoteles')}${tagDept('Restaurantes')}</div>
-  </div>`;
-
-  // MI FOCO ESTA SEMANA
-  if((FOCO_SEMANA.javi||[]).length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Mi foco esta semana</span></div>
-      <div class="focus-list">${(FOCO_SEMANA.javi||[]).map((t,i)=>focusItem(t,'javi-f'+i,'javi')).join('')}</div></div>`;
-  }
-
-  // ESTA SEMANA EN EL ESTUDIO
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Esta semana en el estudio</span></div>
-    <div class="agenda-box">${AGENDA.map(a=>`<div class="agenda-row"><span class="agenda-when">${a.when}</span><span>${a.text}</span></div>`).join('')}</div></div>`;
-
-  // MONTAJES
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Montajes confirmados</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fechas</th><th>Proyecto</th><th>Equipo</th><th>Dpto</th></tr></thead><tbody>
-    ${MONTAJES.map(m=>`<tr><td style="font-size:11px;white-space:nowrap;">${m.fechas}</td><td><b>${m.proj}</b></td><td>${m.equipo}</td><td>${tagDept(m.dept)}</td></tr>`).join('')}
-    </tbody></table></div></div>`;
-
-  // MASTER GLOBAL POR RIESGO CON GANTT
-  const niveles = ['ATENCIÓN MÁXIMA','ATENCIÓN ALTA','SEGUIMIENTO','ESTABLE'];
-  const labelNivel = {'ATENCIÓN MÁXIMA':'Atención Máxima','ATENCIÓN ALTA':'Atención Alta','SEGUIMIENTO':'Seguimiento','ESTABLE':'Estable'};
-  const clsNivel = {'ATENCIÓN MÁXIMA':'tag-crit','ATENCIÓN ALTA':'tag-alto','SEGUIMIENTO':'tag-med','ESTABLE':'tag-baj'};
-
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Master global — por prioridad</span><span class="panel-note">${MASTER.length} proyectos</span></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
-      <input type="text" id="m-search" placeholder="Buscar…" style="font-family:var(--f);font-size:12.5px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);min-width:160px;">
-    </div>`;
-
-  niveles.forEach(nivel => {
-    const projs = MASTER.filter(p=>p.nivel===nivel);
-    if(!projs.length) return;
-    h+=`<div style="margin-bottom:20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span class="tag ${clsNivel[nivel]||'tag-out'}"><span class="dot"></span>${labelNivel[nivel]||nivel}</span>
-        <span style="font-size:11px;color:var(--ink3);">${projs.length} proyectos</span>
-      </div>`;
-
-    projs.forEach(p => {
-      const slug = p.nombre.replace(/\s+/g,'_').toLowerCase();
-      const hasTl = p.tl && Object.keys(p.tl).length>0;
-      const note = st.notes?.['note:'+slug]||'';
-      h+=`<div class="proj-card">
-        <div class="proj-top">
-          <div class="proj-name">${p.nombre}</div>
-          <div class="proj-tags">${p.dept?tagDept(p.dept):''}${p.fase?`<span class="tag tag-out">${p.fase}</span>`:''}</div>
-        </div>
-        ${p.hito&&p.hito!=='—'?`<div class="hito-row"><span class="hito-text">${p.hito}</span><span class="hito-date" style="margin-left:8px;">${p.fecha||''}</span></div>`:''}
-        ${p.resp&&p.resp!=='—'?`<div class="proj-meta"><span class="k">Equipo</span><span>${p.resp}</span></div>`:''}
-        ${p.bloqueador&&p.bloqueador!=='—'?`<div style="font-size:12px;color:var(--crit);margin-bottom:6px;">⚠ ${p.bloqueador}</div>`:''}
-        ${hasTl?renderGantt({...p,slug},'javi'):''}
-        <div class="note-area" style="margin-top:8px;"><label>Nota</label>
-          <textarea data-note="${slug}" data-person="javi" placeholder="Añadir nota…">${note}</textarea>
-        </div>
-      </div>`;
+/* ──────────────────────────────────────────────
+   PERSONAS DEL EQUIPO (derivadas dinámicamente)
+   ────────────────────────────────────────────── */
+function getPersonas() {
+  const set = new Set();
+  (MASTER_DATA || []).forEach(p => {
+    (p.equipo || []).forEach(nombre => {
+      if (nombre) set.add(nombre);
     });
-    h+='</div>';
   });
-
-  h+='</div>';
-  return h;
+  return [...set].sort();
 }
 
-function renderMasterTable(){
-  const q = filterSearch.toLowerCase();
-  const rows = MASTER.filter(p=>{
-    if(filterDept!=='todos'){
-      const d=DEPT_PERSONA; // rough dept from resp
-      const resp=(p.resp||'').toLowerCase();
-      if(filterDept==='Vivienda' && !['alicia','olatz','paula','sara','andrea','cristina','nela'].some(n=>resp.includes(n)) && !(p.nombre||'').toUpperCase().match(/PEDRAZA|ZAHARA|LAGOS 1|ALCALA|FLORIDA|HERMOSILLA|MONTESQUINZA|RINCONADA|ALDAMA|SANTANDER VIV|IBIZA|VALENCIA|PALOMA|TORRE|TEPEYAC|SUR [37]/)) {/* skip */}
-      // simplified: just use intensidad/riesgo filter
-    }
-    if(filterRisk!=='todos'){
-      const rl=riskLbl(p.riesgo);
-      if(filterRisk==='Crítico' && !rl.includes('tico')) return false;
-      if(filterRisk==='Alto' && rl!=='Alto') return false;
-      if(filterRisk==='Medio' && rl!=='Medio') return false;
-      if(filterRisk==='Bajo' && rl!=='Bajo') return false;
-    }
-    if(q && !`${p.nombre} ${p.resp} ${p.estado} ${p.hito} ${p.obs}`.toLowerCase().includes(q)) return false;
-    return true;
-  });
-
-  const el=document.getElementById('master-tbl'); if(!el) return;
-  el.innerHTML=`<div class="tbl-wrap"><table class="tbl"><thead><tr>
-    <th>Proyecto</th><th>Responsable</th><th>Estado</th><th>Próximo hito</th><th>Riesgo</th><th>Observaciones</th>
-  </tr></thead><tbody>
-  ${rows.map(p=>`<tr>
-    <td><b>${p.nombre}</b></td>
-    <td style="font-size:12px;">${p.resp}</td>
-    <td>${p.estado}</td>
-    <td style="font-size:12px;">${p.hito}</td>
-    <td>${tagRisk(p.riesgo)}</td>
-    <td style="font-size:12px;color:var(--ink3);">${p.obs}</td>
-  </tr>`).join('')}
-  </tbody></table></div><div style="font-size:11px;color:var(--ink3);margin-top:6px;">${rows.length} de ${MASTER.length} proyectos</div>`;
+/* ──────────────────────────────────────────────
+   HELPERS DE ESTILO
+   ────────────────────────────────────────────── */
+function deptCls(dpto) {
+  if (!dpto) return '';
+  const d = dpto.toLowerCase();
+  if (d.includes('vivienda'))     return 'dept-viv';
+  if (d.includes('restaurante'))  return 'dept-rest';
+  if (d.includes('hotel'))        return 'dept-hot';
+  return '';
 }
 
-function renderAle(){
-  let h='';
-  h+=`<div class="view-head">
-    <div><div class="view-title">Alejandra · CEO</div><div class="view-sub">${WEEK_LABEL} · Resumen ejecutivo</div></div>
-    <div class="view-tags"><span class="tag tag-vac"><span class="dot"></span>Vacaciones 3–21 ago</span></div>
-  </div>`;
+function atencionCls(nivel) {
+  const n = (nivel || '').toLowerCase().replace(/\s+/g, '-');
+  if (n.includes('maxima') || n.includes('máxima')) return 'risk-high';
+  if (n.includes('alta'))                            return 'risk-med';
+  if (n.includes('seguimiento'))                     return 'risk-low';
+  if (n.includes('estable'))                         return 'risk-ok';
+  return 'risk-none';
+}
 
-  // 1. MI FOCO (hitos de la semana del Excel)
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Esta semana — hitos</span><span class="panel-note">${ALE_HITOS.length} compromisos</span></div>
-    <div class="agenda-box">
-    ${ALE_HITOS.map(a=>`<div class="agenda-row">
-      <span class="agenda-when">${a.when}</span>
-      <div style="flex:1"><b>${a.proj}</b>${a.quien?' · <span style="color:var(--ink3);font-size:12px;">'+a.quien+'</span>':''}<br><span style="font-size:12.5px;color:var(--ink2);">${a.text}</span></div>
-    </div>`).join('')}
-    </div></div>`;
+function atencionLbl(nivel) {
+  return nivel || '—';
+}
 
-  // 2. ALERTAS (filtradas del Excel — solo las importantes)
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas — dónde puede necesitar intervenir</span><span class="panel-note">${ALE_ALERTAS.length} activas</span></div>
-    ${ALE_ALERTAS.map(a=>`<div style="display:flex;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:6px;align-items:flex-start;">
-      <span style="flex-shrink:0;margin-top:2px;">${tagRisk(a.risk)}</span>
-      <div style="flex:1;min-width:0;">
-        <span style="font-weight:600;font-size:13px;">${a.proj}</span>
-        <span style="font-size:11px;color:var(--ink3);margin-left:6px;">${a.resp}</span>
-        <div style="font-size:13px;color:var(--ink2);margin-top:2px;">${a.text}</div>
+function phaseCls(fase) {
+  if (!fase) return '';
+  const f = fase.toLowerCase();
+  if (f.includes('proy'))   return 'phase-proy';
+  if (f.includes('obra'))   return 'phase-obra';
+  if (f.includes('montaj')) return 'phase-mont';
+  if (f.includes('cerrad')) return 'phase-cerr';
+  return '';
+}
+
+function phaseShort(fase) {
+  if (!fase) return '—';
+  if (fase.length <= 10) return fase;
+  return fase.slice(0, 9) + '…';
+}
+
+function tagDept(dpto) {
+  return `<span class="tag-dept ${deptCls(dpto)}">${dpto || '—'}</span>`;
+}
+
+function tagAtencion(nivel) {
+  return `<span class="tag-risk ${atencionCls(nivel)}">${atencionLbl(nivel)}</span>`;
+}
+
+/* ──────────────────────────────────────────────
+   GANTT — VISTA GENERAL (ventana deslizante de 12 semanas)
+   ────────────────────────────────────────────── */
+const GENERAL_WEEKS = 12; // semanas visibles en vista general
+
+function semanaWindow() {
+  const semanas = PLANNING_DATA?.semanas || [];
+  const hoyIdx = semanas.indexOf(hoySemana());
+  if (semanas.length === 0) return [];
+  const start = Math.max(0, hoyIdx);
+  return semanas.slice(start, start + GENERAL_WEEKS);
+}
+
+/* Renderiza Gantt para la ventana de vista general */
+function renderGanttGeneral(proj) {
+  const ventana   = semanaWindow();
+  const planProj  = proj._plan;
+  if (!ventana.length) return '<div class="gantt-empty">Sin datos</div>';
+
+  const hoy = hoySemana();
+  let html = '<div class="gantt-row">';
+
+  ventana.forEach(sem => {
+    const esHoy  = sem === hoy;
+    const entry  = planProj?.timeline.find(t => t.semana === sem);
+    const tieneActividad = entry && entry.actividades && entry.actividades.length > 0;
+    let cls = 'gantt-cell';
+    if (esHoy) cls += ' gantt-today';
+    if (tieneActividad) {
+      const nivel = entry.actividades[0].nivel;
+      cls += nivel === 'principal' ? ' gantt-active' : ' gantt-sec';
+    }
+    const titulo = tieneActividad
+      ? entry.actividades.map(a => a.texto).join(' / ')
+      : '';
+    html += `<div class="${cls}" title="${esHoy ? '▶ ' : ''}${sem}${titulo ? ': ' + titulo : ''}" data-sem="${sem}" data-id="${proj.id}"></div>`;
+  });
+
+  html += '</div>';
+  return html;
+}
+
+/* Renderiza Gantt completo para modal de proyecto (todas las semanas con datos) */
+function renderGanttCompleto(proj) {
+  const planProj = proj._plan;
+  const todasSemanas = PLANNING_DATA?.semanas || [];
+  if (!todasSemanas.length) return '<div class="gantt-empty">Sin datos de planning</div>';
+
+  const hoy = hoySemana();
+
+  // Determinar rango con actividad (o mostrar todo si no hay)
+  const semanasConActividad = new Set(
+    (planProj?.timeline || []).map(t => t.semana)
+  );
+  const semanas = todasSemanas; // todas — continuidad garantizada
+
+  let html = '<div class="gantt-full">';
+  html += '<div class="gantt-labels">';
+  semanas.forEach(s => {
+    html += `<div class="gantt-label${s === hoy ? ' gantt-today-label' : ''}">${s}</div>`;
+  });
+  html += '</div><div class="gantt-row">';
+
+  semanas.forEach(sem => {
+    const esHoy  = sem === hoy;
+    const entry  = planProj?.timeline.find(t => t.semana === sem);
+    const tieneActividad = entry && entry.actividades && entry.actividades.length > 0;
+    let cls = 'gantt-cell';
+    if (esHoy) cls += ' gantt-today';
+    if (tieneActividad) {
+      const nivel = entry.actividades[0].nivel;
+      cls += nivel === 'principal' ? ' gantt-active' : ' gantt-sec';
+    }
+    const titulo = tieneActividad
+      ? entry.actividades.map(a => a.texto).join(' / ')
+      : (semanasConActividad.size > 0 && !tieneActividad ? 'sin actividad registrada' : '');
+    html += `<div class="${cls}" title="${esHoy ? '▶ ' : ''}${sem}${titulo ? ': ' + titulo : ''}"></div>`;
+  });
+
+  html += '</div></div>';
+  return html;
+}
+
+/* ──────────────────────────────────────────────
+   TARJETA DE PROYECTO (lista)
+   ────────────────────────────────────────────── */
+function projCard(proj, opts = {}) {
+  const g = proj._global;
+  const done = S.get(proj.id, 'done') === '1';
+
+  const atencion   = g?.atencion     || '';
+  const bloqueador = g?.bloqueador   || '';
+  const hito       = g?.proximo_hito || '';
+  const fechaHito  = g?.fecha_hito   || '';
+
+  const ganttHtml = opts.showGantt !== false
+    ? `<div class="proj-gantt">${renderGanttGeneral(proj)}</div>`
+    : '';
+
+  const equipoHtml = (proj.equipo || []).length
+    ? `<div class="proj-equipo">${proj.equipo.map(e => `<span class="tag-persona">${e}</span>`).join(' ')}</div>`
+    : '';
+
+  const bloqHtml = bloqueador
+    ? `<div class="proj-bloq">⚠ ${bloqueador}</div>`
+    : '';
+
+  const hitoHtml = hito
+    ? `<div class="proj-hito">→ ${hito}${fechaHito ? ' <em>' + fechaHito + '</em>' : ''}</div>`
+    : '';
+
+  return `
+    <div class="proj-card ${done ? 'proj-done' : ''} ${atencionCls(atencion)}" data-id="${proj.id}">
+      <div class="proj-header">
+        <div class="proj-meta">
+          ${tagDept(proj.dpto)}
+          ${tagAtencion(atencion)}
+          <span class="tag-phase ${phaseCls(proj.fase)}">${phaseShort(proj.fase)}</span>
+        </div>
+        <div class="proj-actions">
+          <button class="btn-done" data-id="${proj.id}" title="Marcar completado">
+            ${done ? '✓' : '○'}
+          </button>
+          <button class="btn-open" data-id="${proj.id}" title="Abrir ficha">↗</button>
+        </div>
       </div>
-    </div>`).join('')}
-  </div>`;
-
-  // 3. MONTAJES
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Montajes confirmados</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fechas</th><th>Proyecto</th><th>Equipo</th><th>Notas</th></tr></thead><tbody>
-    ${ALE_MONTAJES.map(m=>`<tr>
-      <td style="font-size:11px;white-space:nowrap;font-weight:500;color:var(--cop);">${m.fechas}</td>
-      <td><b>${m.proj}</b></td>
-      <td style="font-size:12px;">${m.equipo}</td>
-      <td style="font-size:11.5px;color:var(--ink3);">${m.notas}</td>
-    </tr>`).join('')}
-    </tbody></table></div></div>`;
-
-  // 4. PRESENCIA COMPROMETIDA
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Tu presencia comprometida</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Compromiso</th></tr></thead><tbody>
-    ${ALE_PRESENCIA.map(p=>`<tr>
-      <td style="font-size:11px;white-space:nowrap;font-weight:500;color:var(--cop);">${p.fecha}</td>
-      <td>${p.texto}</td>
-    </tr>`).join('')}
-    </tbody></table></div></div>`;
-
-  // 5. PRÓXIMAS SEMANAS
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Próximas semanas — tener en cuenta</span></div>
-    ${ALE_PROXIMAS.map(s=>`<div class="prox-card">
-      <div class="prox-head">${s.sem}</div>
-      <div class="prox-body">${s.items.map(i=>`<div class="prox-item${i.startsWith('??')?' alert':i.includes('⚠')?' warn':''}">${i}</div>`).join('')}</div>
-    </div>`).join('')}
-  </div>`;
-
-  return h;
+      <div class="proj-nombre" data-id="${proj.id}">${proj.nombre}</div>
+      ${hitoHtml}
+      ${bloqHtml}
+      ${equipoHtml}
+      ${ganttHtml}
+      <div class="proj-note-wrap">
+        <textarea class="proj-note" data-id="${proj.id}" placeholder="Nota…" rows="1">${S.get(proj.id, 'note')}</textarea>
+      </div>
+    </div>`;
 }
 
-function renderPersonal(pid){
-  const state = S._c[pid] || {check:{},notes:{}};
-  const nombre = NOMBRE_PERSONA[pid]||pid;
-  const dept = DEPT_PERSONA[pid]||'';
-  const foco = FOCO_SEMANA[pid]||[];
-  const projNames = PROJS_PERSONA[pid]||[];
-  const isVac = (VAC[pid]||'').includes('15–19 jun');
+/* ──────────────────────────────────────────────
+   MODAL DE PROYECTO (ficha completa)
+   ────────────────────────────────────────────── */
+let _modalId = null;
 
-  let h='';
-  h+=`<div class="view-head">
-    <div><div class="view-title">${nombre}</div><div class="view-sub">${WEEK_LABEL}</div></div>
-    <div class="view-tags">${dept&&dept!=='todos'?tagDept(dept):''}${isVac?'<span class="tag tag-vac"><span class="dot"></span>Vacaciones</span>':''}</div>
-  </div>`;
+function openModal(id) {
+  const proj = enrich(MASTER_DATA.find(p => p.id === id));
+  if (!proj) return;
+  _modalId = id;
 
-  if(foco.length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Foco esta semana</span></div>
-      <div class="focus-list">${foco.map((t,i)=>focusItem(t,`${pid}-f${i}`,pid)).join('')}</div></div>`;
-  }
+  const g = proj._global;
+  const plan = proj._plan;
 
-  // Alertas relevantes
-  const myAlerts = ALERTAS.filter(a=>{
-    const text=`${a.resp} ${a.proj} ${a.text}`.toLowerCase();
-    return text.includes(nombre.toLowerCase()) || projNames.some(p=>text.includes(p.toLowerCase().slice(0,6)));
-  });
-  if(myAlerts.length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas relevantes</span></div>${myAlerts.map(alertRow).join('')}</div>`;
-  }
+  const equipoHtml = (proj.equipo || []).map(e =>
+    `<span class="tag-persona">${e} <small>(${cargaPersona(e)} proy)</small></span>`
+  ).join(' ');
 
-  // Proyectos
-  const myProjs = MASTER.filter(p=> projNames.some(n=> { const pn=p.nombre.toUpperCase(); const nn=n.toUpperCase(); return (nn.length>=8 && pn.startsWith(nn.slice(0,8))) || (pn.length>=8 && nn.startsWith(pn.slice(0,8))) || pn===nn; }));
-  if(myProjs.length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Mis proyectos</span><span class="panel-note">${myProjs.length} activos</span></div>
-      ${myProjs.map(p=>projCard({...p,slug:p.nombre.replace(/\s+/g,'_').toLowerCase()},pid)).join('')}
+  const actividadesHtml = (plan?.timeline || []).length
+    ? plan.timeline.map(t => `
+        <div class="plan-semana">
+          <span class="plan-sem-lbl ${t.semana === hoySemana() ? 'plan-hoy' : ''}">${t.semana}</span>
+          ${t.actividades.map(a =>
+            `<span class="plan-act ${a.nivel === 'principal' ? 'plan-principal' : 'plan-sec'}">${a.texto}</span>`
+          ).join('')}
+        </div>`).join('')
+    : '<p class="plan-empty">Sin actividad registrada en planning.</p>';
+
+  const bloqueadorHtml = g?.bloqueador
+    ? `<div class="modal-bloq">⚠ Bloqueador: ${g.bloqueador}</div>` : '';
+
+  document.getElementById('modal-title').textContent = proj.nombre;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-section">
+      <div class="modal-tags">
+        ${tagDept(proj.dpto)}
+        ${tagAtencion(g?.atencion)}
+        <span class="tag-phase ${phaseCls(proj.fase)}">${proj.fase || '—'}</span>
+      </div>
+    </div>
+
+    ${bloqueadorHtml}
+
+    <div class="modal-grid">
+      <div class="modal-field">
+        <label>Próximo hito</label>
+        <span>${g?.proximo_hito || '—'}</span>
+      </div>
+      <div class="modal-field">
+        <label>Fecha hito</label>
+        <span>${g?.fecha_hito || '—'}</span>
+      </div>
+      <div class="modal-field">
+        <label>Constructora</label>
+        <span>${proj.constructora || '—'}</span>
+      </div>
+      <div class="modal-field">
+        <label>Fin obra previsto</label>
+        <span>${proj.fin_obra || '—'}</span>
+      </div>
+      <div class="modal-field">
+        <label>Montaje</label>
+        <span>${proj.montaje || '—'}</span>
+      </div>
+      <div class="modal-field">
+        <label>Finalización oficial</label>
+        <span>${proj.fin_oficial || '—'}</span>
+      </div>
+    </div>
+
+    <div class="modal-field">
+      <label>Equipo</label>
+      <div>${equipoHtml || '—'}</div>
+    </div>
+
+    ${proj.obs ? `<div class="modal-field"><label>Observaciones</label><span>${proj.obs}</span></div>` : ''}
+
+    <div class="modal-section">
+      <h3>Planning completo</h3>
+      <div class="gantt-completo-wrap">
+        ${renderGanttCompleto(proj)}
+      </div>
+      <div class="plan-actividades">${actividadesHtml}</div>
+    </div>
+
+    <div class="modal-section">
+      <label>Nota personal</label>
+      <textarea class="modal-note" data-id="${proj.id}" rows="3" placeholder="Nota privada (solo en este dispositivo)…">${S.get(proj.id, 'note')}</textarea>
+    </div>
+  `;
+
+  document.getElementById('proj-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  // Guardar nota antes de cerrar
+  const ta = document.querySelector('.modal-note');
+  if (ta && _modalId) S.set(_modalId, 'note', ta.value);
+  document.getElementById('proj-modal').classList.add('hidden');
+  _modalId = null;
+}
+
+/* ──────────────────────────────────────────────
+   VISTA JAVI / PM
+   Agrupado por dpto, con Gantt general visible
+   Incluye: todos los proyectos, alerta de bloqueadores
+   ────────────────────────────────────────────── */
+function renderJavi() {
+  const dptos = ['vivienda', 'restaurantes', 'hoteles'];
+  let html = '';
+
+  // Resumen de bloqueadores
+  const bloqueados = (MASTER_DATA || []).filter(p => globalOf(p.id)?.bloqueador);
+  if (bloqueados.length) {
+    html += `<div class="alert-bar">
+      <strong>⚠ Bloqueadores activos (${bloqueados.length}):</strong>
+      ${bloqueados.map(p => `<span class="alert-item" data-id="${p.id}">${p.nombre}</span>`).join(', ')}
     </div>`;
   }
 
-  // Challan
-  // Renders en pestaña propia
+  // Semana actual destacada
+  html += `<div class="week-banner">Semana actual: <strong>${hoySemana()}</strong></div>`;
 
-  return h;
-}
+  dptos.forEach(dpto => {
+    const proyectos = (MASTER_DATA || [])
+      .filter(p => p.dpto === dpto)
+      .map(enrich);
 
+    if (!proyectos.length) return;
 
-function rendersSection(filterProjs){
-  const rows=filterProjs?RENDERS.filter(c=>filterProjs.some(p=>c.proj.toUpperCase().includes(p.toUpperCase().slice(0,6))||p.toUpperCase().includes(c.proj.toUpperCase().slice(0,6)))):RENDERS;
-  const others=filterProjs?RENDERS.filter(c=>!rows.includes(c)):[];
-  const tR=list=>list.map(r=>`<tr>
-    <td>${tagRisk(r.riesgo)}</td><td><b>${r.proj}</b><br><span style="font-size:10.5px;color:var(--ink3);">${r.resp}</span></td>
-    <td><span class="tag tag-out">${r.fase||'—'}</span></td>
-    <td style="font-size:12px;">${r.estado||'—'}</td>
-    <td style="font-size:11px;white-space:nowrap;">${r.comprometida||'—'}</td>
-    <td style="font-size:11px;white-space:nowrap;${(r.realista||'').startsWith('⚠')?'color:var(--alto);font-weight:500;':''}">${r.realista||'—'}</td>
-    <td style="font-size:12px;color:var(--ink2);">${r.next||'—'}</td>
-  </tr>`).join('');
-  const tbl=list=>`<div class="tbl-wrap"><table class="tbl"><thead><tr>
-    <th>Prio</th><th>Proyecto</th><th>Fase</th><th>Estado</th><th>Comprometida</th><th>Realista</th><th>Próximo paso</th>
-  </tr></thead><tbody>${tR(list)}</tbody></table></div>`;
-  return `<div class="panel">
-    <div class="panel-head"><span class="eyebrow">Renders — cola y estado</span><span class="panel-note">${RENDERS.length} proyectos</span></div>
-    <div style="margin-bottom:10px;padding:8px 12px;background:var(--alto-t);border-radius:var(--r);font-size:12px;color:var(--alto);font-weight:500;">${RENDERS_VAC}</div>
-    ${filterProjs&&rows.length?'<div style="font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px;">Mis proyectos en cola</div>':''}
-    ${filterProjs&&rows.length?tbl(rows):tbl(RENDERS)}
-    ${others.length?`<details class="collapse" style="margin-top:8px;"><summary>Resto de la cola (${others.length})</summary><div class="inner">${tbl(others)}</div></details>`:''}
-    <details class="collapse" style="margin-top:8px;"><summary>Flujo · F1 → F2 → F3</summary>
-      <div class="inner" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;">
-        ${RENDERS_FLUJO.map(f=>`<div style="background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;"><div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);margin-bottom:4px;">${f.fase}</div><div style="font-size:12px;font-weight:500;margin-bottom:4px;">${f.titulo}</div><div style="font-size:11.5px;color:var(--ink3);line-height:1.5;">${f.desc}</div></div>`).join('')}
+    html += `<div class="dept-section">
+      <h2 class="dept-title ${deptCls(dpto)}">${dpto.toUpperCase()}</h2>
+      <div class="proj-list">
+        ${proyectos.map(p => projCard(p)).join('')}
       </div>
-    </details>
+    </div>`;
+  });
+
+  document.getElementById('main-content').innerHTML = html || '<p class="empty">Sin proyectos.</p>';
+}
+
+/* ──────────────────────────────────────────────
+   VISTA ALEJANDRA / CEO
+   Solo proyectos con atención MÁXIMA o ALTA
+   Hitos próximos + bloqueadores destacados
+   Sin Gantt (vista ejecutiva)
+   ────────────────────────────────────────────── */
+function renderAlejandra() {
+  const prioritarios = (MASTER_DATA || [])
+    .map(enrich)
+    .filter(p => {
+      const a = (p._global?.atencion || '').toLowerCase();
+      return a.includes('máxima') || a.includes('maxima') || a.includes('alta');
+    });
+
+  const proximos = (MASTER_DATA || [])
+    .map(enrich)
+    .filter(p => p._global?.fecha_hito)
+    .sort((a, b) => (a._global.fecha_hito || '') < (b._global.fecha_hito || '') ? -1 : 1)
+    .slice(0, 8);
+
+  let html = `<div class="week-banner">Semana actual: <strong>${hoySemana()}</strong></div>`;
+
+  // Proyectos prioritarios
+  html += `<div class="ale-section">
+    <h2>Atención requerida (${prioritarios.length})</h2>
+    <div class="proj-list">
+      ${prioritarios.length
+        ? prioritarios.map(p => projCard(p, { showGantt: false })).join('')
+        : '<p class="empty">Sin proyectos en atención alta.</p>'}
+    </div>
   </div>`;
+
+  // Próximos hitos
+  if (proximos.length) {
+    html += `<div class="ale-section">
+      <h2>Próximos hitos</h2>
+      <table class="hitos-table">
+        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
+        <tbody>
+          ${proximos.map(p => `
+            <tr class="hitos-row" data-id="${p.id}">
+              <td>${p.nombre}</td>
+              <td>${tagDept(p.dpto)}</td>
+              <td>${p._global?.proximo_hito || '—'}</td>
+              <td>${p._global?.fecha_hito || '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  document.getElementById('main-content').innerHTML = html;
 }
 
-function renderRendersView(){
-  let h='';
-  h+=`<div class="view-head"><div><div class="view-title">Renders · 3D</div><div class="view-sub">${WEEK_LABEL}</div></div></div>`;
-  h+=rendersSection(null);
-  return h;
+/* ──────────────────────────────────────────────
+   VISTA PERSONA (individual — derivada dinámicamente)
+   Proyectos donde nombre aparece en equipo
+   Gantt general + carga de la semana
+   ────────────────────────────────────────────── */
+function renderPersona(nombre) {
+  const proyectos = (MASTER_DATA || [])
+    .filter(p => (p.equipo || []).includes(nombre))
+    .map(enrich);
+
+  const carga = cargaPersona(nombre);
+  const hoy = hoySemana();
+
+  // Proyectos activos esta semana
+  const activos = proyectos.filter(p =>
+    (p._plan?.timeline || []).some(t => t.semana === hoy)
+  );
+
+  let html = `
+    <div class="persona-header">
+      <h2>${nombre}</h2>
+      <div class="persona-stats">
+        <span class="stat">${proyectos.length} proyectos totales</span>
+        <span class="stat active">${carga} activos esta semana</span>
+      </div>
+    </div>`;
+
+  if (activos.length) {
+    html += `<div class="dept-section">
+      <h3>Esta semana (${hoy})</h3>
+      <div class="proj-list">
+        ${activos.map(p => projCard(p)).join('')}
+      </div>
+    </div>`;
+  }
+
+  const resto = proyectos.filter(p => !activos.includes(p));
+  if (resto.length) {
+    html += `<div class="dept-section">
+      <h3>Resto de proyectos</h3>
+      <div class="proj-list">
+        ${resto.map(p => projCard(p, { showGantt: false })).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (!proyectos.length) {
+    html += '<p class="empty">Sin proyectos asignados.</p>';
+  }
+
+  document.getElementById('main-content').innerHTML = html;
 }
 
-// ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
-function render(){
+/* ──────────────────────────────────────────────
+   TABS Y NAVEGACIÓN
+   ────────────────────────────────────────────── */
+let curTab = 'javi';
+
+function buildTabs() {
+  const personas = getPersonas();
+  const tabsEl = document.getElementById('tabs');
+  if (!tabsEl) return;
+
+  const fixed = [
+    { id: 'javi',      label: 'Javi / PM' },
+    { id: 'alejandra', label: 'Alejandra' },
+  ];
+
+  const personaTabs = personas.map(nombre => ({
+    id: 'persona__' + nombre.toLowerCase().replace(/\s+/g, '_'),
+    label: nombre,
+    nombre
+  }));
+
+  const allTabs = [...fixed, ...personaTabs];
+
+  tabsEl.innerHTML = allTabs.map(t =>
+    `<button class="tab-btn ${t.id === curTab ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`
+  ).join('');
+}
+
+function activateTab(tabId) {
+  curTab = tabId;
+
+  // Actualizar estado visual
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+
+  // Renderizar contenido
+  if (tabId === 'javi') {
+    renderJavi();
+  } else if (tabId === 'alejandra') {
+    renderAlejandra();
+  } else if (tabId.startsWith('persona__')) {
+    // Recuperar nombre original de MASTER_DATA
+    const personas = getPersonas();
+    const slug = tabId.replace('persona__', '');
+    const nombre = personas.find(n =>
+      n.toLowerCase().replace(/\s+/g, '_') === slug
+    );
+    if (nombre) renderPersona(nombre);
+  }
+}
+
+/* ──────────────────────────────────────────────
+   BÚSQUEDA
+   ────────────────────────────────────────────── */
+function applySearch(query) {
+  const q = query.toLowerCase().trim();
+  if (!q) {
+    activateTab(curTab);
+    return;
+  }
+
+  const resultados = (MASTER_DATA || [])
+    .map(enrich)
+    .filter(p => {
+      const g = p._global;
+      return (
+        p.nombre.toLowerCase().includes(q) ||
+        (p.dpto || '').toLowerCase().includes(q) ||
+        (p.fase || '').toLowerCase().includes(q) ||
+        (g?.atencion || '').toLowerCase().includes(q) ||
+        (g?.proximo_hito || '').toLowerCase().includes(q) ||
+        (g?.bloqueador || '').toLowerCase().includes(q) ||
+        (p.equipo || []).some(e => e.toLowerCase().includes(q))
+      );
+    });
+
+  document.getElementById('main-content').innerHTML = resultados.length
+    ? `<div class="search-results">
+        <p class="search-header">${resultados.length} resultado${resultados.length !== 1 ? 's' : ''} para "<strong>${query}</strong>"</p>
+        <div class="proj-list">${resultados.map(p => projCard(p)).join('')}</div>
+      </div>`
+    : `<p class="empty">Sin resultados para "<strong>${query}</strong>"</p>`;
+}
+
+/* ──────────────────────────────────────────────
+   EXPORTAR RESUMEN
+   ────────────────────────────────────────────── */
+function exportResumen() {
+  const hoy = new Date().toLocaleDateString('es-ES');
+  const semana = hoySemana();
+
+  let lines = [
+    `RESUMEN POMBO ESTUDIO — ${hoy} (${semana})`,
+    '='.repeat(50),
+    ''
+  ];
+
+  const dptos = ['vivienda', 'restaurantes', 'hoteles'];
+  dptos.forEach(dpto => {
+    const proyectos = (MASTER_DATA || []).filter(p => p.dpto === dpto);
+    if (!proyectos.length) return;
+    lines.push(`\n── ${dpto.toUpperCase()} (${proyectos.length}) ──`);
+    proyectos.forEach(p => {
+      const g = globalOf(p.id);
+      lines.push(`  ${p.nombre}`);
+      if (g?.atencion)     lines.push(`    Atención: ${g.atencion}`);
+      if (g?.proximo_hito) lines.push(`    Hito: ${g.proximo_hito}${g.fecha_hito ? ' – ' + g.fecha_hito : ''}`);
+      if (g?.bloqueador)   lines.push(`    ⚠ ${g.bloqueador}`);
+    });
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pombo_resumen_${semana.replace('/', '-')}.txt`;
+  a.click();
+}
+
+/* ──────────────────────────────────────────────
+   EVENTOS
+   ────────────────────────────────────────────── */
+function wireEvents() {
   // Tabs
-  const tabLabels = {'javi':'Javi · Master','ale':'Alejandra · CEO'};
-  let tabsHtml='';
-  // Javi y Ale sin fondo
-  ['javi','ale'].forEach(id=>{
-    const lbl=tabLabels[id]||NOMBRE_PERSONA[id];
-    tabsHtml+=`<button class="tab${id===curPerson?' active':''} tab-master" data-tab="${id}">${lbl}</button>`;
+  document.getElementById('tabs')?.addEventListener('click', e => {
+    const btn = e.target.closest('.tab-btn');
+    if (btn) activateTab(btn.dataset.tab);
   });
-  // Departamentos con fondo de color
-  const deptColors={'VIVIENDA':'rgba(61,100,145,0.10)','RESTAURANTES':'rgba(179,93,48,0.10)','HOTELES':'rgba(67,107,58,0.10)'};
-  const deptBorders={'VIVIENDA':'rgba(61,100,145,0.25)','RESTAURANTES':'rgba(179,93,48,0.25)','HOTELES':'rgba(67,107,58,0.25)'};
-  const deptLbls={'VIVIENDA':'Vivienda','RESTAURANTES':'Restaurantes','HOTELES':'Hoteles'};
-  Object.entries(DEPT_SECTIONS).forEach(([dept,pids])=>{
-    if(!pids.length)return;
-    const bg=deptColors[dept]||'transparent';
-    const br=deptBorders[dept]||'var(--line)';
-    tabsHtml+=`<span style="display:inline-flex;align-items:center;background:${bg};border-left:2px solid ${br};padding:0 6px 0 8px;margin:4px 0;border-radius:0 3px 3px 0;">`;
-    tabsHtml+=`<span style="font-size:8.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:${br};margin-right:4px;white-space:nowrap;">${deptLbls[dept]}</span>`;
-    pids.forEach(id=>{
-      tabsHtml+=`<button class="tab${id===curPerson?' active':''}" data-tab="${id}" style="background:transparent;">${NOMBRE_PERSONA[id]||id}</button>`;
+
+  // Búsqueda
+  const searchEl = document.getElementById('search-input');
+  if (searchEl) {
+    let debounce;
+    searchEl.addEventListener('input', e => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => applySearch(e.target.value), 250);
     });
-    tabsHtml+=`</span>`;
-  });
-  // Renders al final
-  tabsHtml+=`<button class="tab${curPerson==='renders'?' active':''} tab-master" data-tab="renders" style="margin-left:4px;">Renders</button>`;
-  document.getElementById('tabs').innerHTML=tabsHtml;
-
-  document.getElementById('week-badge').textContent = WEEK_STAMP;
-  document.getElementById('update-badge').textContent = UPDATED;
-
-  const view = document.getElementById('view');
-  if(curPerson==='javi'){
-    filterDept='todos'; filterRisk='todos'; filterSearch='';
-    view.innerHTML = renderMaster();
-    renderMasterTable();
-  } else if(curPerson==='ale'){
-    view.innerHTML = renderAle();
-  } else if(curPerson==='renders'){
-    view.innerHTML = renderRendersView();
-  } else {
-    view.innerHTML = renderPersonal(curPerson);
   }
 
+  // Clic en contenido principal (delegado)
+  document.getElementById('main-content')?.addEventListener('click', e => {
+    // Abrir modal
+    const btnOpen = e.target.closest('.btn-open');
+    if (btnOpen) { openModal(btnOpen.dataset.id); return; }
+
+    // Abrir modal al hacer click en nombre
+    const nombre = e.target.closest('.proj-nombre');
+    if (nombre) { openModal(nombre.dataset.id); return; }
+
+    // Toggle done
+    const btnDone = e.target.closest('.btn-done');
+    if (btnDone) {
+      const id = btnDone.dataset.id;
+      const isDone = S.toggle(id, 'done');
+      btnDone.textContent = isDone ? '✓' : '○';
+      btnDone.closest('.proj-card')?.classList.toggle('proj-done', isDone);
+      return;
+    }
+
+    // Abrir modal desde alerta/hito
+    const alertItem = e.target.closest('.alert-item, .hitos-row');
+    if (alertItem?.dataset.id) { openModal(alertItem.dataset.id); return; }
+  });
+
+  // Guardar notas (delegado)
+  document.getElementById('main-content')?.addEventListener('change', e => {
+    const ta = e.target.closest('.proj-note');
+    if (ta) S.set(ta.dataset.id, 'note', ta.value);
+  });
+
+  // Modal: cerrar
+  document.getElementById('modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('proj-modal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('proj-modal')) closeModal();
+  });
+
+  // Modal: guardar nota al cambiar
+  document.getElementById('modal-body')?.addEventListener('change', e => {
+    const ta = e.target.closest('.modal-note');
+    if (ta && _modalId) S.set(_modalId, 'note', ta.value);
+  });
+
+  // Exportar
+  document.getElementById('btn-export')?.addEventListener('click', exportResumen);
+
+  // ESC cierra modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+}
+
+/* ──────────────────────────────────────────────
+   INIT
+   ────────────────────────────────────────────── */
+function init() {
+  buildIndexes();
+  buildTabs();
   wireEvents();
-}
+  activateTab('javi');
 
-
-function openGanttModal(proj){
-  const tl = proj.tl || {};
-  const slug = proj.slug || proj.nombre.replace(/\s+/g,'_').toLowerCase();
-
-  // Construir filas del Gantt expandido (20 semanas)
-  const MONTH_SPANS = [['MAY',0,1],['JUN',2,5],['JUL',6,10],['AGO',11,14],['SEP',15,18],['OCT',19,19]];
-  let monthsHtml = MONTH_SPANS.map(([m,s,e])=>`<div style="grid-column:span ${e-s+1};font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding-left:2px;">${m}</div>`).join('');
-
-  let cells = '';
-  const phases = Array.from({length:20},(_,i)=>tl[i]||null);
-  for(let i=0;i<20;i++){
-    const ph=phases[i];
-    const cls=ph?`gantt-cell filled ${phaseCls(ph)}`:'gantt-cell';
-    const lbl=ph?`<span class="gantt-label">${phaseShort(ph)}</span>`:'';
-    cells+=`<div class="${cls}" title="${ph||'—'} · ${WEEK_LABELS[i]}" style="height:32px;">${lbl}</div>`;
+  // Info de actualización
+  const updEl = document.getElementById('updated-at');
+  if (updEl && META?.updated) {
+    updEl.textContent = 'Actualizado: ' + META.updated.replace('T', ' ').slice(0, 16);
   }
-  const weeksHtml=WEEK_LABELS.map(w=>`<div style="font-size:7.5px;color:var(--ink3);padding-left:2px;overflow:hidden;white-space:nowrap;">${w}</div>`).join('');
-  const todayPct=(TODAY_WEEK/20*100).toFixed(2);
-
-  const bd=document.createElement('div');
-  bd.className='modal-bg'; bd.id='gantt-modal-bg';
-  bd.innerHTML=`<div class="modal" style="max-width:720px;width:100%;">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">${proj.nombre}</div>
-        <div class="modal-sub">${proj.dept||''} · ${proj.fase||''} · ${proj.resp||''}</div>
-      </div>
-      <button class="modal-close" id="gm-close">×</button>
-    </div>
-    <div class="modal-body" style="padding:20px;">
-      <!-- GANTT COMPLETO -->
-      <div style="margin-bottom:16px;">
-        <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-bottom:3px;">${monthsHtml}</div>
-        <div style="position:relative;">
-          <div style="position:absolute;top:0;bottom:0;left:${todayPct}%;width:2px;background:var(--burg);opacity:.65;z-index:3;pointer-events:none;"></div>
-          <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;">${cells}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-top:2px;">${weeksHtml}</div>
-      </div>
-      <!-- DATOS DEL PROYECTO -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
-        <div>
-          <div style="font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;">Información del proyecto</div>
-          ${[
-            ['Estado',proj.estado],['Fase',proj.fase],['Responsable',proj.resp],
-            ['Constructora',proj.constructora],['Próximo hito',proj.hito],
-            ['Fecha',proj.fecha]
-          ].filter(([,v])=>v&&v!=='—').map(([k,v])=>`
-            <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);">
-              <span style="font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);width:100px;flex-shrink:0;">${k}</span>
-              <span style="color:var(--ink2);">${v}</span>
-            </div>`).join('')}
-        </div>
-        <div>
-          <div style="font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;">Riesgos y bloqueadores</div>
-          ${proj.bloqueador&&proj.bloqueador!=='—'?`
-            <div style="padding:8px 12px;background:var(--crit-t);border-radius:var(--r);font-size:12.5px;color:var(--crit);margin-bottom:8px;">⚠ ${proj.bloqueador}</div>`:'<div style="font-size:12.5px;color:var(--ink3);">Sin bloqueadores activos</div>'}
-          ${proj.obs&&proj.obs!==''?`
-            <div style="margin-top:8px;">
-              <div style="font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;">Observaciones</div>
-              <div style="font-size:12.5px;color:var(--ink2);line-height:1.5;">${proj.obs}</div>
-            </div>`:''}
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn-ghost" id="gm-close2">Cerrar</button>
-    </div>
-  </div>`;
-
-  document.body.appendChild(bd);
-  bd.addEventListener('click',e=>{if(e.target===bd)closeGanttModal();});
-  document.getElementById('gm-close').onclick=closeGanttModal;
-  document.getElementById('gm-close2').onclick=closeGanttModal;
 }
 
-function closeGanttModal(){
-  const el=document.getElementById('gantt-modal-bg');
-  if(el)el.remove();
-}
-
-function wireEvents(){
-  // Tabs
-  document.querySelectorAll('[data-tab]').forEach(el=>{
-    el.addEventListener('click', async ()=>{
-      curPerson = el.dataset.tab;
-      await S.load(curPerson);
-      render();
-    });
-  });
-  // Checkboxes
-  document.querySelectorAll('[data-check]').forEach(el=>{
-    el.addEventListener('change', ()=>{
-      S.setCheck(el.dataset.person, el.dataset.check, el.checked);
-      el.closest('.focus-item').classList.toggle('done', el.checked);
-    });
-  });
-  // Notas proyecto
-  document.querySelectorAll('[data-note]').forEach(el=>{
-    el.addEventListener('change', ()=>{ S.setNote(el.dataset.person, 'note:'+el.dataset.note, el.value); });
-  });
-  // Celdas Gantt
-  document.querySelectorAll('[data-gantt-expand]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const proj = MASTER.find(p=>p.nombre===el.dataset.nombre);
-      if(proj) openGanttModal(proj);
-    });
-  });
-  document.querySelectorAll('[data-notekey]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      openCellModal(el.dataset.slug, parseInt(el.dataset.week), el.dataset.phase, el.dataset.person, el.dataset.notekey);
-    });
-    const state = S._c[el.dataset.person] || {check:{},notes:{}};
-    if(state.notes?.[el.dataset.notekey]) el.classList.add('has-note');
-  });
-  // Filtros master
-  document.querySelectorAll('[data-fdept]').forEach(el=>{
-    el.addEventListener('click', ()=>{ filterDept=el.dataset.fdept; renderMasterTable(); });
-  });
-  document.querySelectorAll('[data-frisk]').forEach(el=>{
-    el.addEventListener('click', ()=>{ filterRisk=el.dataset.frisk; renderMasterTable(); });
-  });
-  const ms=document.getElementById('m-search');
-  if(ms) ms.addEventListener('input', ()=>{ filterSearch=ms.value; renderMasterTable(); });
-  // Challan request
-  const chBtn=document.getElementById('ch-submit');
-  if(chBtn) chBtn.addEventListener('click', ()=>{
-    const proj=document.getElementById('ch-proj')?.value?.trim();
-    if(!proj){ alert('Indica el nombre del proyecto'); return; }
-    const key=`challan-req:${Date.now()}`;
-    const data={proj, fase:document.getElementById('ch-fase')?.value, doc:document.getElementById('ch-doc')?.value, fecha:document.getElementById('ch-fecha')?.value, notas:document.getElementById('ch-notas')?.value, quien:NOMBRE_PERSONA[curPerson], cuando:new Date().toLocaleString('es-ES')};
-    S.setNote('javi', key, JSON.stringify(data));
-    document.getElementById('ch-msg').style.display='block';
-    ['ch-proj','ch-doc','ch-fecha','ch-notas'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  });
-}
-
-// ── EXPORT ───────────────────────────────────────────────────────────────────
-document.getElementById('export-btn').addEventListener('click', async ()=>{
-  const out={_exported:new Date().toISOString(),_week:WEEK_LABEL,data:{}};
-  for(const id of PERSON_ORDER){ await S.load(id); out.data['s:'+id]=S._c[id]; }
-  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=`pm_estado_${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-});
-
-// ── INIT ─────────────────────────────────────────────────────────────────────
-(function init(){
-  for(const id of PERSON_ORDER) S.load(id);
-  render();
-})();
-
-
-
-
-
-
-
+document.addEventListener('DOMContentLoaded', init);
