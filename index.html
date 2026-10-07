@@ -234,7 +234,7 @@ details.collapse .inner{padding:0 14px 14px;}
 <body>
 <script>
 const META          = {
-  "updated": "2026-10-07T14:16:39",
+  "updated": "2026-10-07T14:27:25",
   "hoy_semana": "W41/2026",
   "perfiles": [
     "javi",
@@ -3611,11 +3611,12 @@ function buildTabs() {
     if (!people.length) return;
     const st = GROUP_STYLES[dept] || {};
 
-    // Banda de fondo para el grupo
+    // Banda de fondo para el grupo — color más diferenciable
     html += `<div class="tab-group" style="
       display:flex;align-items:center;gap:2px;
-      background:color-mix(in srgb,${st.bg} 12%,transparent);
-      border-radius:6px;padding:2px 4px;">`;
+      background:color-mix(in srgb,${st.bg} 22%,transparent);
+      border-radius:6px;padding:2px 6px;
+      border:1px solid color-mix(in srgb,${st.bg} 35%,transparent);">`;
 
     people.forEach(nombre => {
       const slug = nombre.toLowerCase().replace(/\s+/g,'_');
@@ -3664,9 +3665,17 @@ function renderJavi() {
     </div>
   </div>`;
 
+  const BG_JAVI = {
+    0: 'rgba(180,30,30,.05)',   // ALERTA — rojo muy suave
+    1: 'rgba(196,122,42,.05)',  // ATENCIÓN — ámbar muy suave
+    2: 'rgba(80,80,140,.04)',   // INFO FALTANTE — azul muy suave
+    3: 'rgba(0,0,0,.02)',       // CONTROLADO — neutro
+  };
+
   GRUPOS.forEach(g => {
     if (!g.projs.length) return;
-    html += `<div class="panel panel-${g.level===0?'alerta':g.level===1?'atencion':'default'}">
+    const panelCls = g.level===0?'panel-alerta':g.level===1?'panel-atencion':'';
+    html += `<div class="panel ${panelCls}" style="background:${BG_JAVI[g.level]};">
       <div class="panel-head">
         <span class="eyebrow">${tagHtml(g.cls, g.label)}&ensp;<span style="font-weight:300;color:var(--ink3);">${g.projs.length}</span></span>
       </div>
@@ -3725,7 +3734,7 @@ function renderAlejandra() {
   </div>`;
 
   // ALERTA
-  html += `<div class="panel panel-alerta">
+  html += `<div class="panel panel-alerta" style="background:rgba(180,30,30,.05);">
     <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}</div>
     ${alerta.length
       ? alerta.map(p => projCard(p,{gantt:false})).join('')
@@ -3733,7 +3742,7 @@ function renderAlejandra() {
   </div>`;
 
   // ATENCIÓN
-  html += `<div class="panel panel-atencion">
+  html += `<div class="panel panel-atencion" style="background:rgba(196,122,42,.05);">
     <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}</div>
     ${atencion.length
       ? atencion.map(p => projCard(p,{gantt:false})).join('')
