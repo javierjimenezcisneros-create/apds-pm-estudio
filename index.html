@@ -234,7 +234,7 @@ details.collapse .inner{padding:0 14px 14px;}
 <body>
 <script>
 const META          = {
-  "updated": "2026-10-07T12:35:19",
+  "updated": "2026-10-07T12:42:57",
   "hoy_semana": "W41/2026",
   "perfiles": [
     "javi",
@@ -3110,734 +3110,571 @@ const PLANNING_DATA = {
 <script>
 /* ============================================================
    POMBO ESTUDIO — app.js
-   Trabaja exclusivamente con MASTER_DATA, GLOBAL_DATA, PLANNING_DATA, META
-   Todos los datos inyectados por generate_app.py
+   Usa MASTER_DATA, GLOBAL_DATA, PLANNING_DATA, META
+   IDs de DOM según head.html: #view, #tabs, #export-btn,
+   #week-badge, #update-badge
    ============================================================ */
 
-/* ──────────────────────────────────────────────
-   ESTADO LOCAL (localStorage)
-   Checkboxes y notas por persona/proyecto
-   ────────────────────────────────────────────── */
+/* ── localStorage ─────────────────────────────────────────── */
 const S = {
-  key: (pid, field) => `pombo_${pid}_${field}`,
-  get: (pid, field, def = '') => {
-    try { return localStorage.getItem(S.key(pid, field)) ?? def; }
-    catch { return def; }
-  },
-  set: (pid, field, val) => {
-    try { localStorage.setItem(S.key(pid, field), val); }
-    catch {}
-  },
-  toggle: (pid, field) => {
-    const v = S.get(pid, field, '0') === '1' ? '0' : '1';
-    S.set(pid, field, v);
-    return v === '1';
-  }
+  key: (pid, f) => `pombo_${pid}_${f}`,
+  get: (pid, f, d = '') => { try { return localStorage.getItem(S.key(pid,f)) ?? d; } catch { return d; } },
+  set: (pid, f, v) => { try { localStorage.setItem(S.key(pid,f), v); } catch {} },
+  toggle: (pid, f) => { const v = S.get(pid,f,'0')==='1'?'0':'1'; S.set(pid,f,v); return v==='1'; }
 };
 
-/* ──────────────────────────────────────────────
-   CRUCE DE DATOS: indexar GLOBAL y PLANNING por id
-   ────────────────────────────────────────────── */
-let _globalIdx = null;
-let _planIdx   = null;
+/* ── Índices ──────────────────────────────────────────────── */
+let _gIdx = null, _pIdx = null;
 
 function buildIndexes() {
-  _globalIdx = {};
-  (GLOBAL_DATA || []).forEach(g => { _globalIdx[g.id] = g; });
-
-  _planIdx = {};
-  ((PLANNING_DATA || {}).proyectos || []).forEach(p => { _planIdx[p.id] = p; });
+  _gIdx = {}; (GLOBAL_DATA||[]).forEach(g => { _gIdx[g.id] = g; });
+  _pIdx = {}; ((PLANNING_DATA||{}).proyectos||[]).forEach(p => { _pIdx[p.id] = p; });
 }
 
-function globalOf(id) { return _globalIdx?.[id] || null; }
-function planOf(id)   { return _planIdx?.[id]   || null; }
+const globalOf = id => _gIdx?.[id] || null;
+const planOf   = id => _pIdx?.[id] || null;
 
-/* Enriquece un proyecto MASTER con datos de GLOBAL y PLANNING */
-function enrich(proj) {
-  return {
-    ...proj,
-    _global:   globalOf(proj.id),
-    _plan:     planOf(proj.id),
-  };
+function enrich(p) {
+  return { ...p, _g: globalOf(p.id), _p: planOf(p.id) };
 }
 
-/* ──────────────────────────────────────────────
-   SEMANA ACTUAL
-   ────────────────────────────────────────────── */
-function hoySemana() {
-  return META?.hoy_semana || '';
-}
-
-/* Índice de una semana en PLANNING_DATA.semanas */
-function semanaIdx(semana) {
-  return (PLANNING_DATA?.semanas || []).indexOf(semana);
-}
-
-/* ──────────────────────────────────────────────
-   CARGA POR PERSONA (calculada en APP)
-   Cuenta proyectos activos de una persona en la semana actual
-   ────────────────────────────────────────────── */
-function cargaPersona(nombre) {
-  const hoy = hoySemana();
-  return (MASTER_DATA || []).filter(p => {
-    if (!(p.equipo || []).includes(nombre)) return false;
-    const plan = planOf(p.id);
-    if (!plan) return false;
-    return plan.timeline.some(t => t.semana === hoy);
-  }).length;
-}
-
-/* ──────────────────────────────────────────────
-   PERSONAS DEL EQUIPO (derivadas dinámicamente)
-   ────────────────────────────────────────────── */
-function getPersonas() {
-  const set = new Set();
-  (MASTER_DATA || []).forEach(p => {
-    (p.equipo || []).forEach(nombre => {
-      if (nombre) set.add(nombre);
-    });
-  });
-  return [...set].sort();
-}
-
-/* ──────────────────────────────────────────────
-   HELPERS DE ESTILO
-   ────────────────────────────────────────────── */
-function deptCls(dpto) {
-  if (!dpto) return '';
-  const d = dpto.toLowerCase();
-  if (d.includes('vivienda'))     return 'dept-viv';
-  if (d.includes('restaurante'))  return 'dept-rest';
-  if (d.includes('hotel'))        return 'dept-hot';
-  return '';
-}
-
-function atencionCls(nivel) {
-  const n = (nivel || '').toLowerCase().replace(/\s+/g, '-');
-  if (n.includes('maxima') || n.includes('máxima')) return 'risk-high';
-  if (n.includes('alta'))                            return 'risk-med';
-  if (n.includes('seguimiento'))                     return 'risk-low';
-  if (n.includes('estable'))                         return 'risk-ok';
-  return 'risk-none';
-}
-
-function atencionLbl(nivel) {
-  return nivel || '—';
-}
-
-function phaseCls(fase) {
-  if (!fase) return '';
-  const f = fase.toLowerCase();
-  if (f.includes('proy'))   return 'phase-proy';
-  if (f.includes('obra'))   return 'phase-obra';
-  if (f.includes('montaj')) return 'phase-mont';
-  if (f.includes('cerrad')) return 'phase-cerr';
-  return '';
-}
-
-function phaseShort(fase) {
-  if (!fase) return '—';
-  if (fase.length <= 10) return fase;
-  return fase.slice(0, 9) + '…';
-}
-
-function tagDept(dpto) {
-  return `<span class="tag-dept ${deptCls(dpto)}">${dpto || '—'}</span>`;
-}
-
-function tagAtencion(nivel) {
-  return `<span class="tag-risk ${atencionCls(nivel)}">${atencionLbl(nivel)}</span>`;
-}
-
-/* ──────────────────────────────────────────────
-   GANTT — VISTA GENERAL (ventana deslizante de 12 semanas)
-   ────────────────────────────────────────────── */
-const GENERAL_WEEKS = 12; // semanas visibles en vista general
+/* ── Semanas ──────────────────────────────────────────────── */
+const hoySemana = () => META?.hoy_semana || '';
+const VENTANA   = 12; // semanas visibles en vista general
 
 function semanaWindow() {
-  const semanas = PLANNING_DATA?.semanas || [];
-  const hoyIdx = semanas.indexOf(hoySemana());
-  if (semanas.length === 0) return [];
-  const start = Math.max(0, hoyIdx);
-  return semanas.slice(start, start + GENERAL_WEEKS);
+  const sems = PLANNING_DATA?.semanas || [];
+  const i = sems.indexOf(hoySemana());
+  return sems.slice(Math.max(0,i), Math.max(0,i) + VENTANA);
 }
 
-/* Renderiza Gantt para la ventana de vista general */
-function renderGanttGeneral(proj) {
-  const ventana   = semanaWindow();
-  const planProj  = proj._plan;
-  if (!ventana.length) return '<div class="gantt-empty">Sin datos</div>';
-
+/* ── Carga persona ───────────────────────────────────────── */
+function cargaPersona(nombre) {
   const hoy = hoySemana();
-  let html = '<div class="gantt-row">';
+  return (MASTER_DATA||[]).filter(p =>
+    (p.equipo||[]).includes(nombre) &&
+    (planOf(p.id)?.timeline||[]).some(t => t.semana === hoy)
+  ).length;
+}
 
+/* ── Personas dinámicas ──────────────────────────────────── */
+function getPersonas() {
+  const s = new Set();
+  (MASTER_DATA||[]).forEach(p => (p.equipo||[]).forEach(n => { if(n) s.add(n); }));
+  return [...s].sort();
+}
+
+/* ── Helpers estilo ──────────────────────────────────────── */
+function deptTag(dpto) {
+  const d = (dpto||'').toLowerCase();
+  if (d.includes('vivienda'))    return ['tag-viv','VIVIENDA'];
+  if (d.includes('restaurante')) return ['tag-rest','REST'];
+  if (d.includes('hotel'))       return ['tag-hot','HOTEL'];
+  return ['tag-out', dpto||'—'];
+}
+
+function riskTag(nivel) {
+  const n = (nivel||'').toUpperCase();
+  if (n.includes('MÁXIMA')||n.includes('MAXIMA')) return ['tag-crit','● CRÍTICO'];
+  if (n.includes('ALTA'))                          return ['tag-alto','● ALTO'];
+  if (n.includes('SEGUIMIENTO'))                   return ['tag-med','● MED'];
+  if (n.includes('ESTABLE'))                       return ['tag-baj','● OK'];
+  return ['tag-out','—'];
+}
+
+function tagHtml(cls, txt) {
+  return `<span class="tag ${cls}">${txt}</span>`;
+}
+
+/* ── Gantt general (ventana 12 sem) ─────────────────────── */
+function ganttGeneral(proj) {
+  const ventana = semanaWindow();
+  const plan    = proj._p;
+  const hoy     = hoySemana();
+  if (!ventana.length) return '';
+
+  // Meses para cabecera agrupada
+  let mesActual = '', mesHtml = '<div class="gantt-months">';
+  ventana.forEach(sem => {
+    const partes = sem.split('/'); // W41/2026
+    // Aproximar mes por número de semana
+    mesHtml += `<div class="gantt-month"></div>`;
+  });
+  mesHtml += '</div>';
+
+  let cellsHtml = '<div class="gantt-grid">';
   ventana.forEach(sem => {
     const esHoy  = sem === hoy;
-    const entry  = planProj?.timeline.find(t => t.semana === sem);
-    const tieneActividad = entry && entry.actividades && entry.actividades.length > 0;
-    let cls = 'gantt-cell';
-    if (esHoy) cls += ' gantt-today';
-    if (tieneActividad) {
-      const nivel = entry.actividades[0].nivel;
-      cls += nivel === 'principal' ? ' gantt-active' : ' gantt-sec';
-    }
-    const titulo = tieneActividad
-      ? entry.actividades.map(a => a.texto).join(' / ')
-      : '';
-    html += `<div class="${cls}" title="${esHoy ? '▶ ' : ''}${sem}${titulo ? ': ' + titulo : ''}" data-sem="${sem}" data-id="${proj.id}"></div>`;
+    const entry  = plan?.timeline.find(t => t.semana === sem);
+    const act    = entry?.actividades?.[0];
+    const texto  = act?.texto || '';
+    // Fase → color de celda
+    let phCls = texto ? faseColor(texto) : '';
+    let cls = `gantt-cell${phCls ? ' '+phCls+' filled' : ''}`;
+    const title = `${sem}${texto ? ': '+texto : ''}`;
+    cellsHtml += `<div class="${cls}" title="${title}" data-sem="${sem}" data-id="${proj.id}">
+      ${texto ? `<span class="gantt-label">${abrev(texto)}</span>` : ''}
+    </div>`;
   });
+  cellsHtml += '</div>';
 
-  html += '</div>';
-  return html;
+  // Marcador de hoy
+  const hoyIdx = ventana.indexOf(hoy);
+  let todayHtml = '';
+  if (hoyIdx >= 0) {
+    const pct = (hoyIdx / ventana.length * 100).toFixed(1);
+    todayHtml = `<div class="gantt-row" style="position:relative;">
+      <div class="gantt-today" style="left:calc(${pct}% + ${hoyIdx}px)"></div>
+      <div class="gantt-today-lbl" style="left:calc(${pct}% + ${hoyIdx+4}px)">HOY</div>
+    </div>`;
+  }
+
+  return `<div class="gantt">${mesHtml}<div class="gantt-row" style="position:relative;">${todayHtml}${cellsHtml}</div></div>`;
 }
 
-/* Renderiza Gantt completo para modal de proyecto (todas las semanas con datos) */
-function renderGanttCompleto(proj) {
-  const planProj = proj._plan;
-  const todasSemanas = PLANNING_DATA?.semanas || [];
-  if (!todasSemanas.length) return '<div class="gantt-empty">Sin datos de planning</div>';
+/* ── Gantt completo (modal) ─────────────────────────────── */
+function ganttCompleto(proj) {
+  const sems = PLANNING_DATA?.semanas || [];
+  const plan  = proj._p;
+  const hoy   = hoySemana();
+  if (!sems.length) return '<p style="color:var(--ink3);font-size:12px;">Sin datos de planning.</p>';
 
-  const hoy = hoySemana();
-
-  // Determinar rango con actividad (o mostrar todo si no hay)
-  const semanasConActividad = new Set(
-    (planProj?.timeline || []).map(t => t.semana)
-  );
-  const semanas = todasSemanas; // todas — continuidad garantizada
-
-  let html = '<div class="gantt-full">';
-  html += '<div class="gantt-labels">';
-  semanas.forEach(s => {
-    html += `<div class="gantt-label${s === hoy ? ' gantt-today-label' : ''}">${s}</div>`;
+  let cellsHtml = '<div class="gantt-grid" style="grid-template-columns:repeat('+sems.length+',1fr)">';
+  sems.forEach(sem => {
+    const esHoy = sem === hoy;
+    const entry = plan?.timeline.find(t => t.semana === sem);
+    const texto = entry?.actividades?.[0]?.texto || '';
+    let phCls = texto ? faseColor(texto) : '';
+    let cls = `gantt-cell${phCls?' '+phCls+' filled':''}${esHoy?' gantt-cell-hoy':''}`;
+    cellsHtml += `<div class="${cls}" title="${sem}${texto?': '+texto:''}">${texto?`<span class="gantt-label">${abrev(texto)}</span>`:''}</div>`;
   });
-  html += '</div><div class="gantt-row">';
+  cellsHtml += '</div>';
 
-  semanas.forEach(sem => {
-    const esHoy  = sem === hoy;
-    const entry  = planProj?.timeline.find(t => t.semana === sem);
-    const tieneActividad = entry && entry.actividades && entry.actividades.length > 0;
-    let cls = 'gantt-cell';
-    if (esHoy) cls += ' gantt-today';
-    if (tieneActividad) {
-      const nivel = entry.actividades[0].nivel;
-      cls += nivel === 'principal' ? ' gantt-active' : ' gantt-sec';
-    }
-    const titulo = tieneActividad
-      ? entry.actividades.map(a => a.texto).join(' / ')
-      : (semanasConActividad.size > 0 && !tieneActividad ? 'sin actividad registrada' : '');
-    html += `<div class="${cls}" title="${esHoy ? '▶ ' : ''}${sem}${titulo ? ': ' + titulo : ''}"></div>`;
+  let weeksHtml = '<div class="gantt-weeks" style="grid-template-columns:repeat('+sems.length+',1fr)">';
+  sems.forEach(sem => {
+    weeksHtml += `<div class="gantt-week${sem===hoy?' gantt-week-hoy':''}">${sem.split('/')[0]}</div>`;
   });
+  weeksHtml += '</div>';
 
-  html += '</div></div>';
-  return html;
+  return `<div class="gantt">${cellsHtml}${weeksHtml}</div>`;
 }
 
-/* ──────────────────────────────────────────────
-   TARJETA DE PROYECTO (lista)
-   ────────────────────────────────────────────── */
-function projCard(proj, opts = {}) {
-  const g = proj._global;
-  const done = S.get(proj.id, 'done') === '1';
+/* ── Helpers texto ───────────────────────────────────────── */
+function abrev(txt) {
+  if (!txt) return '';
+  const t = txt.toUpperCase();
+  if (t.includes('PROY')) return 'PRY';
+  if (t.includes('OBRA')) return 'OBR';
+  if (t.includes('MONTAJ')) return 'MNT';
+  if (t.includes('ENTREGA')) return 'ENT';
+  if (t.includes('RENDER')) return 'RND';
+  if (t.includes('VISITA')) return 'VIS';
+  if (t.includes('PEDIDO')) return 'PED';
+  return txt.slice(0,3).toUpperCase();
+}
 
-  const atencion   = g?.atencion     || '';
-  const bloqueador = g?.bloqueador   || '';
-  const hito       = g?.proximo_hito || '';
-  const fechaHito  = g?.fecha_hito   || '';
+function faseColor(txt) {
+  const t = (txt||'').toUpperCase();
+  if (t.includes('PROY') || t.includes('ANTEPR')) return 'ph1';
+  if (t.includes('OBRA'))   return 'ph2';
+  if (t.includes('MONTAJ')) return 'ph3';
+  if (t.includes('ENTREGA'))return 'ph4';
+  if (t.includes('RENDER')) return 'ph5';
+  if (t.includes('VISITA')) return 'ph6';
+  if (t.includes('PEDIDO')) return 'ph7';
+  if (t.includes('PARAD') || t.includes('ESPERA')) return 'ph9';
+  return 'ph1';
+}
 
-  const ganttHtml = opts.showGantt !== false
-    ? `<div class="proj-gantt">${renderGanttGeneral(proj)}</div>`
-    : '';
-
-  const equipoHtml = (proj.equipo || []).length
-    ? `<div class="proj-equipo">${proj.equipo.map(e => `<span class="tag-persona">${e}</span>`).join(' ')}</div>`
-    : '';
-
-  const bloqHtml = bloqueador
-    ? `<div class="proj-bloq">⚠ ${bloqueador}</div>`
-    : '';
+/* ── Tarjeta de proyecto ─────────────────────────────────── */
+function projCard(proj, opts={}) {
+  const g    = proj._g;
+  const done = S.get(proj.id,'done')==='1';
+  const [dCls, dTxt] = deptTag(proj.dpto);
+  const [rCls, rTxt] = riskTag(g?.atencion);
+  const hito    = g?.proximo_hito || '';
+  const fecha   = g?.fecha_hito   || '';
+  const bloq    = g?.bloqueador   || '';
+  const equipo  = (proj.equipo||[]).map(e=>`<span style="font-size:11px;color:var(--ink3)">${e}</span>`).join(' · ');
+  const note    = S.get(proj.id,'note');
 
   const hitoHtml = hito
-    ? `<div class="proj-hito">→ ${hito}${fechaHito ? ' <em>' + fechaHito + '</em>' : ''}</div>`
+    ? `<div class="hito-row"><span class="hito-text">${hito}</span>${fecha?`<span class="hito-date">${fecha}</span>`:''}</div>`
     : '';
+  const bloqHtml = bloq
+    ? `<div style="font-size:11.5px;color:var(--crit);margin:4px 0;">⚠ ${bloq}</div>`
+    : '';
+  const ganttHtml = opts.gantt !== false ? ganttGeneral(proj) : '';
+  const equipoHtml = equipo ? `<div style="margin-top:6px;">${equipo}</div>` : '';
 
-  return `
-    <div class="proj-card ${done ? 'proj-done' : ''} ${atencionCls(atencion)}" data-id="${proj.id}">
-      <div class="proj-header">
-        <div class="proj-meta">
-          ${tagDept(proj.dpto)}
-          ${tagAtencion(atencion)}
-          <span class="tag-phase ${phaseCls(proj.fase)}">${phaseShort(proj.fase)}</span>
+  return `<div class="proj-card${done?' proj-done':''}" data-id="${proj.id}">
+    <div class="proj-top">
+      <div>
+        <div class="proj-tags" style="margin-bottom:5px;">
+          ${tagHtml(dCls,dTxt)} ${tagHtml(rCls,rTxt)}
+          ${proj.fase?`<span class="tag tag-out">${proj.fase}</span>`:''}
         </div>
-        <div class="proj-actions">
-          <button class="btn-done" data-id="${proj.id}" title="Marcar completado">
-            ${done ? '✓' : '○'}
-          </button>
-          <button class="btn-open" data-id="${proj.id}" title="Abrir ficha">↗</button>
-        </div>
+        <div class="proj-name" style="cursor:pointer;" data-open="${proj.id}">${proj.nombre}</div>
       </div>
-      <div class="proj-nombre" data-id="${proj.id}">${proj.nombre}</div>
-      ${hitoHtml}
-      ${bloqHtml}
-      ${equipoHtml}
-      ${ganttHtml}
-      <div class="proj-note-wrap">
-        <textarea class="proj-note" data-id="${proj.id}" placeholder="Nota…" rows="1">${S.get(proj.id, 'note')}</textarea>
+      <div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0;">
+        <button class="btn-done btn-ghost" data-done="${proj.id}" style="font-size:16px;padding:2px 8px;line-height:1;">${done?'✓':'○'}</button>
+        <button class="btn-ghost btn-open" data-open="${proj.id}" style="font-size:11px;">↗</button>
       </div>
-    </div>`;
+    </div>
+    ${hitoHtml}${bloqHtml}${equipoHtml}
+    ${ganttHtml}
+    <div class="note-area" style="margin-top:10px;">
+      <label>Nota</label>
+      <textarea data-note="${proj.id}" rows="1" placeholder="Nota privada…">${note}</textarea>
+    </div>
+  </div>`;
 }
 
-/* ──────────────────────────────────────────────
-   MODAL DE PROYECTO (ficha completa)
-   ────────────────────────────────────────────── */
+/* ── Modal de proyecto ───────────────────────────────────── */
 let _modalId = null;
 
 function openModal(id) {
-  const proj = enrich(MASTER_DATA.find(p => p.id === id));
-  if (!proj) return;
+  const raw = MASTER_DATA.find(p => p.id === id);
+  if (!raw) return;
   _modalId = id;
+  const proj = enrich(raw);
+  const g    = proj._g;
+  const plan = proj._p;
 
-  const g = proj._global;
-  const plan = proj._plan;
-
-  const equipoHtml = (proj.equipo || []).map(e =>
-    `<span class="tag-persona">${e} <small>(${cargaPersona(e)} proy)</small></span>`
+  const equipoHtml = (proj.equipo||[]).map(e =>
+    `<span class="tag tag-out">${e} <small style="color:var(--cop)">${cargaPersona(e)} proy</small></span>`
   ).join(' ');
 
-  const actividadesHtml = (plan?.timeline || []).length
-    ? plan.timeline.map(t => `
-        <div class="plan-semana">
-          <span class="plan-sem-lbl ${t.semana === hoySemana() ? 'plan-hoy' : ''}">${t.semana}</span>
-          ${t.actividades.map(a =>
-            `<span class="plan-act ${a.nivel === 'principal' ? 'plan-principal' : 'plan-sec'}">${a.texto}</span>`
-          ).join('')}
-        </div>`).join('')
-    : '<p class="plan-empty">Sin actividad registrada en planning.</p>';
+  const planHtml = (plan?.timeline||[]).length
+    ? `<div style="display:flex;flex-direction:column;gap:4px;">
+        ${plan.timeline.map(t => `
+          <div style="display:flex;gap:8px;align-items:baseline;">
+            <span style="font-size:10px;font-weight:600;letter-spacing:.06em;color:${t.semana===hoySemana()?'var(--burg)':'var(--cop)'};">${t.semana}</span>
+            ${t.actividades.map(a=>`<span style="font-size:12.5px;color:var(--ink2);">${a.texto}</span>`).join(', ')}
+          </div>`).join('')}
+      </div>`
+    : '<p style="font-size:12px;color:var(--ink3);">Sin actividad registrada en planning.</p>';
 
-  const bloqueadorHtml = g?.bloqueador
-    ? `<div class="modal-bloq">⚠ Bloqueador: ${g.bloqueador}</div>` : '';
+  const decoHtml = (proj.deco_cerrada||proj.presupuesto_deco_aceptado||proj.pedidos_confirmados)
+    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+        <span class="tag ${proj.deco_cerrada==='SÍ'?'tag-baj':'tag-out'}">Deco cerrada: ${proj.deco_cerrada||'—'}</span>
+        <span class="tag ${proj.presupuesto_deco_aceptado==='SÍ'?'tag-baj':'tag-out'}">Ppto aceptado: ${proj.presupuesto_deco_aceptado||'—'}</span>
+        <span class="tag ${proj.pedidos_confirmados==='SÍ'?'tag-baj':'tag-out'}">Pedidos: ${proj.pedidos_confirmados||'—'}</span>
+      </div>` : '';
 
-  document.getElementById('modal-title').textContent = proj.nombre;
-  document.getElementById('modal-body').innerHTML = `
-    <div class="modal-section">
-      <div class="modal-tags">
-        ${tagDept(proj.dpto)}
-        ${tagAtencion(g?.atencion)}
-        <span class="tag-phase ${phaseCls(proj.fase)}">${proj.fase || '—'}</span>
+  const html = `
+    <div class="modal-bg" id="modal-bg">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <div class="modal-title">${proj.nombre}</div>
+            <div class="modal-sub">${proj.dpto||''} · ${proj.fase||''}</div>
+          </div>
+          <button class="modal-close" id="modal-close">×</button>
+        </div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">
+            ${tagHtml(...deptTag(proj.dpto))} ${tagHtml(...riskTag(g?.atencion))}
+          </div>
+          ${g?.bloqueador?`<div style="color:var(--crit);font-size:12.5px;margin-bottom:10px;">⚠ ${g.bloqueador}</div>`:''}
+          <table style="width:100%;font-size:12.5px;border-collapse:collapse;margin-bottom:12px;">
+            ${row2('Próximo hito', g?.proximo_hito||'—')}
+            ${row2('Fecha hito', g?.fecha_hito||'—')}
+            ${row2('Constructora', proj.constructora||'—')}
+            ${row2('Fin obra', proj.fin_obra||'—')}
+            ${row2('Montaje', proj.montaje||'—')}
+            ${row2('Fin oficial', proj.fin_oficial||'—')}
+            ${row2('Estado', proj.estado||'—')}
+          </table>
+          ${decoHtml}
+          ${equipoHtml?`<div style="margin:10px 0;">${equipoHtml}</div>`:''}
+          ${proj.obs?`<p style="font-size:12px;color:var(--ink2);margin-bottom:10px;">${proj.obs}</p>`:''}
+          <div style="margin-top:14px;">
+            <div class="eyebrow" style="margin-bottom:8px;">Planning completo</div>
+            ${ganttCompleto(proj)}
+            <div style="margin-top:8px;">${planHtml}</div>
+          </div>
+          <div class="note-area" style="margin-top:14px;">
+            <label>Nota personal</label>
+            <textarea id="modal-note" rows="3" placeholder="Solo en este dispositivo…">${S.get(proj.id,'note')}</textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn-ghost" id="modal-close2">Cerrar</button>
+        </div>
       </div>
-    </div>
+    </div>`;
 
-    ${bloqueadorHtml}
+  // Eliminar modal anterior si existe
+  document.getElementById('modal-bg')?.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
 
-    <div class="modal-grid">
-      <div class="modal-field">
-        <label>Próximo hito</label>
-        <span>${g?.proximo_hito || '—'}</span>
-      </div>
-      <div class="modal-field">
-        <label>Fecha hito</label>
-        <span>${g?.fecha_hito || '—'}</span>
-      </div>
-      <div class="modal-field">
-        <label>Constructora</label>
-        <span>${proj.constructora || '—'}</span>
-      </div>
-      <div class="modal-field">
-        <label>Fin obra previsto</label>
-        <span>${proj.fin_obra || '—'}</span>
-      </div>
-      <div class="modal-field">
-        <label>Montaje</label>
-        <span>${proj.montaje || '—'}</span>
-      </div>
-      <div class="modal-field">
-        <label>Finalización oficial</label>
-        <span>${proj.fin_oficial || '—'}</span>
-      </div>
-    </div>
+  document.getElementById('modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('modal-close2')?.addEventListener('click', closeModal);
+  document.getElementById('modal-bg')?.addEventListener('click', e => {
+    if (e.target.id === 'modal-bg') closeModal();
+  });
+  document.getElementById('modal-note')?.addEventListener('change', e => {
+    S.set(_modalId, 'note', e.target.value);
+  });
+}
 
-    <div class="modal-field">
-      <label>Equipo</label>
-      <div>${equipoHtml || '—'}</div>
-    </div>
-
-    ${proj.obs ? `<div class="modal-field"><label>Observaciones</label><span>${proj.obs}</span></div>` : ''}
-
-    <div class="modal-section">
-      <h3>Planning completo</h3>
-      <div class="gantt-completo-wrap">
-        ${renderGanttCompleto(proj)}
-      </div>
-      <div class="plan-actividades">${actividadesHtml}</div>
-    </div>
-
-    <div class="modal-section">
-      <label>Nota personal</label>
-      <textarea class="modal-note" data-id="${proj.id}" rows="3" placeholder="Nota privada (solo en este dispositivo)…">${S.get(proj.id, 'note')}</textarea>
-    </div>
-  `;
-
-  document.getElementById('proj-modal').classList.remove('hidden');
+function row2(k, v) {
+  return `<tr><td style="color:var(--ink3);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 0;width:110px;">${k}</td><td style="padding:4px 0;">${v}</td></tr>`;
 }
 
 function closeModal() {
-  // Guardar nota antes de cerrar
-  const ta = document.querySelector('.modal-note');
-  if (ta && _modalId) S.set(_modalId, 'note', ta.value);
-  document.getElementById('proj-modal').classList.add('hidden');
+  const note = document.getElementById('modal-note');
+  if (note && _modalId) S.set(_modalId, 'note', note.value);
+  document.getElementById('modal-bg')?.remove();
   _modalId = null;
 }
 
-/* ──────────────────────────────────────────────
-   VISTA JAVI / PM
-   Agrupado por dpto, con Gantt general visible
-   Incluye: todos los proyectos, alerta de bloqueadores
-   ────────────────────────────────────────────── */
+/* ── Render Javi / PM ────────────────────────────────────── */
 function renderJavi() {
-  const dptos = ['vivienda', 'restaurantes', 'hoteles'];
-  let html = '';
+  const dptos = ['vivienda','restaurantes','hoteles'];
+  const bloqueados = (MASTER_DATA||[]).filter(p => globalOf(p.id)?.bloqueador);
 
-  // Resumen de bloqueadores
-  const bloqueados = (MASTER_DATA || []).filter(p => globalOf(p.id)?.bloqueador);
-  if (bloqueados.length) {
-    html += `<div class="alert-bar">
-      <strong>⚠ Bloqueadores activos (${bloqueados.length}):</strong>
-      ${bloqueados.map(p => `<span class="alert-item" data-id="${p.id}">${p.nombre}</span>`).join(', ')}
-    </div>`;
-  }
-
-  // Semana actual destacada
-  html += `<div class="week-banner">Semana actual: <strong>${hoySemana()}</strong></div>`;
-
-  dptos.forEach(dpto => {
-    const proyectos = (MASTER_DATA || [])
-      .filter(p => p.dpto === dpto)
-      .map(enrich);
-
-    if (!proyectos.length) return;
-
-    html += `<div class="dept-section">
-      <h2 class="dept-title ${deptCls(dpto)}">${dpto.toUpperCase()}</h2>
-      <div class="proj-list">
-        ${proyectos.map(p => projCard(p)).join('')}
-      </div>
-    </div>`;
-  });
-
-  document.getElementById('main-content').innerHTML = html || '<p class="empty">Sin proyectos.</p>';
-}
-
-/* ──────────────────────────────────────────────
-   VISTA ALEJANDRA / CEO
-   Solo proyectos con atención MÁXIMA o ALTA
-   Hitos próximos + bloqueadores destacados
-   Sin Gantt (vista ejecutiva)
-   ────────────────────────────────────────────── */
-function renderAlejandra() {
-  const prioritarios = (MASTER_DATA || [])
-    .map(enrich)
-    .filter(p => {
-      const a = (p._global?.atencion || '').toLowerCase();
-      return a.includes('máxima') || a.includes('maxima') || a.includes('alta');
-    });
-
-  const proximos = (MASTER_DATA || [])
-    .map(enrich)
-    .filter(p => p._global?.fecha_hito)
-    .sort((a, b) => (a._global.fecha_hito || '') < (b._global.fecha_hito || '') ? -1 : 1)
-    .slice(0, 8);
-
-  let html = `<div class="week-banner">Semana actual: <strong>${hoySemana()}</strong></div>`;
-
-  // Proyectos prioritarios
-  html += `<div class="ale-section">
-    <h2>Atención requerida (${prioritarios.length})</h2>
-    <div class="proj-list">
-      ${prioritarios.length
-        ? prioritarios.map(p => projCard(p, { showGantt: false })).join('')
-        : '<p class="empty">Sin proyectos en atención alta.</p>'}
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">Javi · Master</div>
+      <div class="view-sub">Semana ${hoySemana()}</div>
+    </div>
+    <div class="view-tags">
+      ${tagHtml('tag-viv','● Vivienda')}
+      ${tagHtml('tag-hot','● Hoteles')}
+      ${tagHtml('tag-rest','● Restaurantes')}
     </div>
   </div>`;
 
-  // Próximos hitos
-  if (proximos.length) {
-    html += `<div class="ale-section">
-      <h2>Próximos hitos</h2>
-      <table class="hitos-table">
-        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
-        <tbody>
-          ${proximos.map(p => `
-            <tr class="hitos-row" data-id="${p.id}">
-              <td>${p.nombre}</td>
-              <td>${tagDept(p.dpto)}</td>
-              <td>${p._global?.proximo_hito || '—'}</td>
-              <td>${p._global?.fecha_hito || '—'}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
+  if (bloqueados.length) {
+    html += `<div class="panel">
+      <div class="panel-head"><span class="eyebrow">Bloqueadores activos · ${bloqueados.length}</span></div>
+      <div>
+        ${bloqueados.map(p => {
+          const g = globalOf(p.id);
+          return `<div class="sem-card crit" style="cursor:pointer;" data-open="${p.id}">
+            <div class="sem-week">${p.nombre} <span style="font-weight:300;font-size:10px;">${p.dpto}</span></div>
+            <div class="sem-items">⚠ ${g?.bloqueador}</div>
+          </div>`;
+        }).join('')}
+      </div>
     </div>`;
   }
 
-  document.getElementById('main-content').innerHTML = html;
+  dptos.forEach(dpto => {
+    const proyectos = (MASTER_DATA||[]).filter(p => p.dpto === dpto).map(enrich);
+    if (!proyectos.length) return;
+    const label = dpto === 'vivienda' ? 'Vivienda' : dpto === 'restaurantes' ? 'Restaurantes' : 'Hoteles';
+    const tagCls = dpto === 'vivienda' ? 'tag-viv' : dpto === 'restaurantes' ? 'tag-rest' : 'tag-hot';
+    html += `<div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">${label} · ${proyectos.length}</span>
+      </div>
+      ${proyectos.map(p => projCard(p)).join('')}
+    </div>`;
+  });
+
+  document.getElementById('view').innerHTML = html;
 }
 
-/* ──────────────────────────────────────────────
-   VISTA PERSONA (individual — derivada dinámicamente)
-   Proyectos donde nombre aparece en equipo
-   Gantt general + carga de la semana
-   ────────────────────────────────────────────── */
-function renderPersona(nombre) {
-  const proyectos = (MASTER_DATA || [])
-    .filter(p => (p.equipo || []).includes(nombre))
-    .map(enrich);
+/* ── Render Alejandra / CEO ──────────────────────────────── */
+function renderAlejandra() {
+  const prioritarios = (MASTER_DATA||[]).map(enrich).filter(p => {
+    const a = (p._g?.atencion||'').toUpperCase();
+    return a.includes('MÁXIMA')||a.includes('MAXIMA')||a.includes('ALTA');
+  });
 
-  const carga = cargaPersona(nombre);
-  const hoy = hoySemana();
+  const proximos = (MASTER_DATA||[]).map(enrich)
+    .filter(p => p._g?.fecha_hito)
+    .sort((a,b) => (a._g.fecha_hito < b._g.fecha_hito ? -1 : 1))
+    .slice(0, 10);
 
-  // Proyectos activos esta semana
-  const activos = proyectos.filter(p =>
-    (p._plan?.timeline || []).some(t => t.semana === hoy)
-  );
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">Alejandra · CEO</div>
+      <div class="view-sub">Semana ${hoySemana()} · ${prioritarios.length} proyectos requieren atención</div>
+    </div>
+  </div>`;
 
-  let html = `
-    <div class="persona-header">
-      <h2>${nombre}</h2>
-      <div class="persona-stats">
-        <span class="stat">${proyectos.length} proyectos totales</span>
-        <span class="stat active">${carga} activos esta semana</span>
-      </div>
+  html += `<div class="panel">
+    <div class="panel-head"><span class="eyebrow">Atención requerida · ${prioritarios.length}</span></div>
+    ${prioritarios.length
+      ? prioritarios.map(p => projCard(p, {gantt:false})).join('')
+      : '<p class="panel-note">Sin proyectos en atención alta.</p>'}
+  </div>`;
+
+  if (proximos.length) {
+    html += `<div class="panel">
+      <div class="panel-head"><span class="eyebrow">Próximos hitos</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr>
+          <th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th>
+        </tr></thead>
+        <tbody>
+          ${proximos.map(p => `<tr style="cursor:pointer;" data-open="${p.id}">
+            <td><strong>${p.nombre}</strong></td>
+            <td>${tagHtml(...deptTag(p.dpto))}</td>
+            <td>${p._g?.proximo_hito||'—'}</td>
+            <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
     </div>`;
+  }
+
+  document.getElementById('view').innerHTML = html;
+}
+
+/* ── Render Persona ──────────────────────────────────────── */
+function renderPersona(nombre) {
+  const todos    = (MASTER_DATA||[]).filter(p => (p.equipo||[]).includes(nombre)).map(enrich);
+  const hoy      = hoySemana();
+  const activos  = todos.filter(p => (p._p?.timeline||[]).some(t => t.semana === hoy));
+  const resto    = todos.filter(p => !activos.includes(p));
+  const carga    = activos.length;
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">${nombre}</div>
+      <div class="view-sub">${todos.length} proyectos · ${carga} activos esta semana (${hoy})</div>
+    </div>
+  </div>`;
 
   if (activos.length) {
-    html += `<div class="dept-section">
-      <h3>Esta semana (${hoy})</h3>
-      <div class="proj-list">
-        ${activos.map(p => projCard(p)).join('')}
-      </div>
+    html += `<div class="panel">
+      <div class="panel-head"><span class="eyebrow">Esta semana · ${hoy}</span></div>
+      ${activos.map(p => projCard(p)).join('')}
     </div>`;
   }
 
-  const resto = proyectos.filter(p => !activos.includes(p));
   if (resto.length) {
-    html += `<div class="dept-section">
-      <h3>Resto de proyectos</h3>
-      <div class="proj-list">
-        ${resto.map(p => projCard(p, { showGantt: false })).join('')}
-      </div>
+    html += `<div class="panel">
+      <div class="panel-head"><span class="eyebrow">Resto de proyectos · ${resto.length}</span></div>
+      ${resto.map(p => projCard(p, {gantt:false})).join('')}
     </div>`;
   }
 
-  if (!proyectos.length) {
-    html += '<p class="empty">Sin proyectos asignados.</p>';
+  if (!todos.length) {
+    html += '<p class="panel-note" style="margin-top:20px;">Sin proyectos asignados.</p>';
   }
 
-  document.getElementById('main-content').innerHTML = html;
+  document.getElementById('view').innerHTML = html;
 }
 
-/* ──────────────────────────────────────────────
-   TABS Y NAVEGACIÓN
-   ────────────────────────────────────────────── */
+/* ── Tabs ─────────────────────────────────────────────────── */
 let curTab = 'javi';
 
 function buildTabs() {
   const personas = getPersonas();
-  const tabsEl = document.getElementById('tabs');
+  const tabsEl   = document.getElementById('tabs');
   if (!tabsEl) return;
 
   const fixed = [
-    { id: 'javi',      label: 'Javi / PM' },
-    { id: 'alejandra', label: 'Alejandra' },
+    { id:'javi',      label:'Javi · Master', cls:'tab-master' },
+    { id:'alejandra', label:'Alejandra · CEO' },
   ];
-
-  const personaTabs = personas.map(nombre => ({
-    id: 'persona__' + nombre.toLowerCase().replace(/\s+/g, '_'),
-    label: nombre,
-    nombre
+  const pTabs = personas.map(n => ({
+    id: 'p__' + n.toLowerCase().replace(/\s+/g,'_'),
+    label: n,
+    nombre: n
   }));
 
-  const allTabs = [...fixed, ...personaTabs];
-
-  tabsEl.innerHTML = allTabs.map(t =>
-    `<button class="tab-btn ${t.id === curTab ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`
+  tabsEl.innerHTML = [...fixed, ...pTabs].map(t =>
+    `<button class="tab ${t.cls||''} ${t.id===curTab?'active':''}" data-tab="${t.id}">${t.label}</button>`
   ).join('');
 }
 
-function activateTab(tabId) {
-  curTab = tabId;
+function activateTab(id) {
+  curTab = id;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
 
-  // Actualizar estado visual
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabId);
-  });
-
-  // Renderizar contenido
-  if (tabId === 'javi') {
-    renderJavi();
-  } else if (tabId === 'alejandra') {
-    renderAlejandra();
-  } else if (tabId.startsWith('persona__')) {
-    // Recuperar nombre original de MASTER_DATA
-    const personas = getPersonas();
-    const slug = tabId.replace('persona__', '');
-    const nombre = personas.find(n =>
-      n.toLowerCase().replace(/\s+/g, '_') === slug
-    );
+  if (id === 'javi')      renderJavi();
+  else if (id === 'alejandra') renderAlejandra();
+  else if (id.startsWith('p__')) {
+    const slug = id.slice(3);
+    const nombre = getPersonas().find(n => n.toLowerCase().replace(/\s+/g,'_') === slug);
     if (nombre) renderPersona(nombre);
   }
 }
 
-/* ──────────────────────────────────────────────
-   BÚSQUEDA
-   ────────────────────────────────────────────── */
-function applySearch(query) {
-  const q = query.toLowerCase().trim();
-  if (!q) {
-    activateTab(curTab);
-    return;
-  }
-
-  const resultados = (MASTER_DATA || [])
-    .map(enrich)
-    .filter(p => {
-      const g = p._global;
-      return (
-        p.nombre.toLowerCase().includes(q) ||
-        (p.dpto || '').toLowerCase().includes(q) ||
-        (p.fase || '').toLowerCase().includes(q) ||
-        (g?.atencion || '').toLowerCase().includes(q) ||
-        (g?.proximo_hito || '').toLowerCase().includes(q) ||
-        (g?.bloqueador || '').toLowerCase().includes(q) ||
-        (p.equipo || []).some(e => e.toLowerCase().includes(q))
-      );
-    });
-
-  document.getElementById('main-content').innerHTML = resultados.length
-    ? `<div class="search-results">
-        <p class="search-header">${resultados.length} resultado${resultados.length !== 1 ? 's' : ''} para "<strong>${query}</strong>"</p>
-        <div class="proj-list">${resultados.map(p => projCard(p)).join('')}</div>
-      </div>`
-    : `<p class="empty">Sin resultados para "<strong>${query}</strong>"</p>`;
-}
-
-/* ──────────────────────────────────────────────
-   EXPORTAR RESUMEN
-   ────────────────────────────────────────────── */
-function exportResumen() {
+/* ── Exportar ─────────────────────────────────────────────── */
+function exportar() {
   const hoy = new Date().toLocaleDateString('es-ES');
-  const semana = hoySemana();
+  const sem = hoySemana();
+  const lines = [`POMBO ESTUDIO — ${hoy} (${sem})`, '='.repeat(50), ''];
 
-  let lines = [
-    `RESUMEN POMBO ESTUDIO — ${hoy} (${semana})`,
-    '='.repeat(50),
-    ''
-  ];
-
-  const dptos = ['vivienda', 'restaurantes', 'hoteles'];
-  dptos.forEach(dpto => {
-    const proyectos = (MASTER_DATA || []).filter(p => p.dpto === dpto);
-    if (!proyectos.length) return;
-    lines.push(`\n── ${dpto.toUpperCase()} (${proyectos.length}) ──`);
-    proyectos.forEach(p => {
+  ['vivienda','restaurantes','hoteles'].forEach(dpto => {
+    const ps = (MASTER_DATA||[]).filter(p => p.dpto === dpto);
+    if (!ps.length) return;
+    lines.push(`\n── ${dpto.toUpperCase()} (${ps.length}) ──`);
+    ps.forEach(p => {
       const g = globalOf(p.id);
       lines.push(`  ${p.nombre}`);
-      if (g?.atencion)     lines.push(`    Atención: ${g.atencion}`);
-      if (g?.proximo_hito) lines.push(`    Hito: ${g.proximo_hito}${g.fecha_hito ? ' – ' + g.fecha_hito : ''}`);
+      if (g?.atencion)     lines.push(`    ${g.atencion}`);
+      if (g?.proximo_hito) lines.push(`    → ${g.proximo_hito}${g.fecha_hito?' ('+g.fecha_hito+')':''}`);
       if (g?.bloqueador)   lines.push(`    ⚠ ${g.bloqueador}`);
     });
   });
 
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `pombo_resumen_${semana.replace('/', '-')}.txt`;
+  a.download = `pombo_${sem.replace('/','_')}.txt`;
   a.click();
 }
 
-/* ──────────────────────────────────────────────
-   EVENTOS
-   ────────────────────────────────────────────── */
+/* ── Eventos ──────────────────────────────────────────────── */
 function wireEvents() {
   // Tabs
   document.getElementById('tabs')?.addEventListener('click', e => {
-    const btn = e.target.closest('.tab-btn');
-    if (btn) activateTab(btn.dataset.tab);
+    const b = e.target.closest('.tab');
+    if (b) activateTab(b.dataset.tab);
   });
 
-  // Búsqueda
-  const searchEl = document.getElementById('search-input');
-  if (searchEl) {
-    let debounce;
-    searchEl.addEventListener('input', e => {
-      clearTimeout(debounce);
-      debounce = setTimeout(() => applySearch(e.target.value), 250);
-    });
-  }
-
-  // Clic en contenido principal (delegado)
-  document.getElementById('main-content')?.addEventListener('click', e => {
+  // Clic en vista (delegado)
+  document.getElementById('view')?.addEventListener('click', e => {
     // Abrir modal
-    const btnOpen = e.target.closest('.btn-open');
-    if (btnOpen) { openModal(btnOpen.dataset.id); return; }
-
-    // Abrir modal al hacer click en nombre
-    const nombre = e.target.closest('.proj-nombre');
-    if (nombre) { openModal(nombre.dataset.id); return; }
+    const open = e.target.closest('[data-open]');
+    if (open) { openModal(open.dataset.open); return; }
 
     // Toggle done
-    const btnDone = e.target.closest('.btn-done');
-    if (btnDone) {
-      const id = btnDone.dataset.id;
+    const done = e.target.closest('[data-done]');
+    if (done) {
+      const id = done.dataset.done;
       const isDone = S.toggle(id, 'done');
-      btnDone.textContent = isDone ? '✓' : '○';
-      btnDone.closest('.proj-card')?.classList.toggle('proj-done', isDone);
+      done.textContent = isDone ? '✓' : '○';
+      done.closest('.proj-card')?.classList.toggle('proj-done', isDone);
       return;
     }
-
-    // Abrir modal desde alerta/hito
-    const alertItem = e.target.closest('.alert-item, .hitos-row');
-    if (alertItem?.dataset.id) { openModal(alertItem.dataset.id); return; }
   });
 
-  // Guardar notas (delegado)
-  document.getElementById('main-content')?.addEventListener('change', e => {
-    const ta = e.target.closest('.proj-note');
-    if (ta) S.set(ta.dataset.id, 'note', ta.value);
-  });
-
-  // Modal: cerrar
-  document.getElementById('modal-close')?.addEventListener('click', closeModal);
-  document.getElementById('proj-modal')?.addEventListener('click', e => {
-    if (e.target === document.getElementById('proj-modal')) closeModal();
-  });
-
-  // Modal: guardar nota al cambiar
-  document.getElementById('modal-body')?.addEventListener('change', e => {
-    const ta = e.target.closest('.modal-note');
-    if (ta && _modalId) S.set(_modalId, 'note', ta.value);
+  // Guardar nota
+  document.getElementById('view')?.addEventListener('change', e => {
+    const ta = e.target.closest('[data-note]');
+    if (ta) S.set(ta.dataset.note, 'note', ta.value);
   });
 
   // Exportar
-  document.getElementById('btn-export')?.addEventListener('click', exportResumen);
+  document.getElementById('export-btn')?.addEventListener('click', exportar);
 
   // ESC cierra modal
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
-  });
+  document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
 }
 
-/* ──────────────────────────────────────────────
-   INIT
-   ────────────────────────────────────────────── */
+/* ── Init ─────────────────────────────────────────────────── */
 function init() {
   buildIndexes();
   buildTabs();
   wireEvents();
   activateTab('javi');
 
-  // Info de actualización
-  const updEl = document.getElementById('updated-at');
-  if (updEl && META?.updated) {
-    updEl.textContent = 'Actualizado: ' + META.updated.replace('T', ' ').slice(0, 16);
-  }
+  // Badges del topbar
+  const wb = document.getElementById('week-badge');
+  if (wb) wb.textContent = hoySemana();
+
+  const ub = document.getElementById('update-badge');
+  if (ub && META?.updated) ub.textContent = 'Actualizado ' + META.updated.replace('T',' ').slice(0,16);
 }
 
 document.addEventListener('DOMContentLoaded', init);
