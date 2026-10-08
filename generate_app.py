@@ -14,12 +14,13 @@ OUT   = os.path.join(BASE, 'docs', 'index.html')
 wb = openpyxl.load_workbook(EXCEL, data_only=True)
 print("Hojas:", wb.sheetnames)
 
-# ── Semanas: se generan dinámicamente desde la hoja PLANNING ─────────────────
-# (se rellenan después de leer el Excel; valores por defecto mientras tanto)
+# ── Semanas: 1 sep → 10 nov 2026 (11 semanas) ────────────────────────────────
 hoy = date.today()
-WEEK_LABELS = []   # se rellena en extract_planning
-MONTHS      = []   # se rellena en extract_planning
-TODAY_WEEK  = 0    # se recalcula después
+sem_inicio = date(2026, 9, 1)
+TODAY_WEEK = max(0, min((hoy - sem_inicio).days // 7, 10))
+WEEK_LABELS = ['1 SEP','8 SEP','15 SEP','22 SEP','29 SEP',
+               '6 OCT','13 OCT','20 OCT','27 OCT','3 NOV','10 NOV']
+MONTHS = [["SEP",0,4],["OCT",5,8],["NOV",9,10]]
 
 def find_sheet(*keywords):
     """Busca la primera hoja cuyo nombre contiene TODOS los keywords (si se pasan varios)
@@ -87,93 +88,25 @@ def extract_planning(sheet_name):
     ws = wb[sheet_name]
     rows = list(ws.iter_rows(min_row=1, max_row=ws.max_row,
                               max_col=ws.max_column, values_only=True))
-    week_cols = {}   # col_index → week_label
+    week_cols = {}   # col_index → week_index
     header_idx = None
-    dates_row_idx = None
 
-    # 1. Buscar fila de cabecera: col1 == 'PROYECTO'
     for i, row in enumerate(rows):
+        # Find the header row: col1 == 'PROYECTO'
         if len(row) > 1 and str(row[1] or '').strip() == 'PROYECTO':
             header_idx = i
+            # Weeks start at col 6 (0-based)
+            for j in range(6, len(row)):
+                c = row[j]
+                if c and isinstance(c, str) and any(ch.isdigit() for ch in str(c)):
+                    week_idx = j - 6   # 0=1SEP, 1=8SEP, ...
+                    if week_idx < len(WEEK_LABELS):
+                        week_cols[j] = week_idx
             break
 
-    if header_idx is None:
-        print(f"  ⚠ No se encontró cabecera PROYECTO en {sheet_name}")
+    if not week_cols or header_idx is None:
+        print(f"  ⚠ No se encontró cabecera en {sheet_name}")
         return {}
-
-    # 2. Buscar fila de fechas: la fila ANTES de la cabecera que tenga fechas
-    #    (p.ej. "28 SEP", "5 OCT"...) o en la misma cabecera
-    def row_has_dates(row):
-        return any(
-            c and isinstance(c, str) and any(ch.isdigit() for ch in c)
-            for c in row[4:]
-        )
-
-    # Mirar 1-3 filas antes de la cabecera
-    dates_row = None
-    for offset in range(1, 4):
-        candidate_idx = header_idx - offset
-        if candidate_idx >= 0 and row_has_dates(rows[candidate_idx]):
-            dates_row = rows[candidate_idx]
-            dates_row_idx = candidate_idx
-            break
-    # Si no hay fila previa, buscar en la misma cabecera
-    if dates_row is None and row_has_dates(rows[header_idx]):
-        dates_row = rows[header_idx]
-
-    if dates_row is None:
-        print(f"  ⚠ No se encontraron fechas de semana en {sheet_name}")
-        return {}
-
-    # 3. Mapear col_index → etiqueta de semana (empezando desde col 5)
-    week_counter = 0
-    for j in range(5, len(dates_row)):
-        c = dates_row[j]
-        if c and isinstance(c, str) and any(ch.isdigit() for ch in c):
-            label = str(c).strip()
-            week_cols[j] = (week_counter, label)
-            week_counter += 1
-
-    if not week_cols:
-        print(f"  ⚠ No se mapearon columnas de semana en {sheet_name}")
-        return {}
-
-    # Rellenar WEEK_LABELS y MONTHS globales desde las fechas del Excel
-    global WEEK_LABELS, MONTHS, TODAY_WEEK
-    if not WEEK_LABELS:
-        from datetime import datetime
-        labels = [label for (_, label) in sorted(week_cols.values())]
-        WEEK_LABELS = labels
-
-        # Calcular MONTHS: agrupar etiquetas por mes
-        month_map = {}
-        for idx, (_, label) in sorted((v[0], v) for v in week_cols.values()):
-            # label: "28 SEP", "5 OCT", etc.
-            parts = label.strip().split()
-            mes = parts[-1] if len(parts) >= 2 else '?'
-            if mes not in month_map:
-                month_map[mes] = [idx, idx]
-            else:
-                month_map[mes][1] = idx
-        MONTHS = [[mes, r[0], r[1]] for mes, r in month_map.items()]
-
-        # TODAY_WEEK: índice de la semana actual
-        def parse_label(label):
-            meses = {'ENE':1,'FEB':2,'MAR':3,'ABR':4,'MAY':5,'JUN':6,
-                     'JUL':7,'AGO':8,'SEP':9,'OCT':10,'NOV':11,'DIC':12}
-            parts = label.strip().split()
-            if len(parts) < 2: return None
-            try:
-                d = int(parts[0]); m = meses.get(parts[-1].upper())
-                return date(hoy.year if m >= hoy.month - 3 else hoy.year + 1, m, d)
-            except: return None
-
-        hoy_d = hoy
-        TODAY_WEEK = 0
-        for idx, (_, label) in sorted((v[0], v) for v in week_cols.values()):
-            d = parse_label(label)
-            if d and d <= hoy_d:
-                TODAY_WEEK = idx
 
     tl = {}
     for row in rows[header_idx + 1:]:
@@ -186,7 +119,7 @@ def extract_planning(sheet_name):
         if n in ('VACACIONES', '🏖', 'PROYECTO'): continue
 
         phases = {}
-        for col, (idx, label) in week_cols.items():
+        for col, idx in week_cols.items():
             if col < len(row) and row[col] and str(row[col]).strip() not in {'None','','—'}:
                 phases[idx] = str(row[col]).strip()
         if phases:
@@ -399,15 +332,78 @@ MONTAJES = ALE_MONTAJES if ALE_MONTAJES else []
 AGENDA = [{'when':a['when'],'text':f"{a['proj']} — {a['text']}"} for a in ALE_HITOS[:8]]
 VAC = {}
 
+# ── CONSTRUIR MASTER_DATA (formato que espera app.js) ─────────────────────────
+def make_id(nombre, dept):
+    """ID único: DEPT_NOMBRE_SIN_ESPACIOS"""
+    n = nombre.upper().replace(' ', '_').replace('-', '_')[:20]
+    d = (dept or '').upper().replace(' ', '')[:3]
+    return f"{d}_{n}" if d else n
+
+# Asignar IDs a cada proyecto
+for p in MASTER:
+    p['id'] = make_id(p['nombre'], p['dept'])
+
+MASTER_DATA = [
+    {
+        'id':      p['id'],
+        'nombre':  p['nombre'],
+        'dpto':    p['dept'],
+        'equipo':  [r.strip() for r in
+                    str(p.get('resp','')).replace('/',' / ').replace('+',' / ').split('/')
+                    if r.strip() and len(r.strip()) > 1],
+        'estado':  p['estado'],
+        'hito':    p['hito'],
+        'fecha':   p['fecha'],
+        'bloqueador': p['bloqueador'],
+        'constructora': p['constructora'],
+        'fase':    p['fase'],
+        'atencion': p['atencion'],
+        'nivel':   p['nivel'],
+        'obs':     p['obs'],
+    }
+    for p in MASTER
+]
+
+# GLOBAL_DATA: mismos proyectos con campos adicionales (constructora, fase, etc.)
+GLOBAL_DATA = [
+    {
+        'id':           p['id'],
+        'constructora': p['constructora'],
+        'fase':         p['fase'],
+        'atencion':     p['atencion'],
+        'nivel':        p['nivel'],
+        'obs':          p['obs'],
+    }
+    for p in MASTER
+]
+
+# PLANNING_DATA: {semanas, proyectos: [{id, fases:{0:"X",...}}]}
+planning_proyectos = []
+for p in MASTER:
+    if p.get('tl'):
+        planning_proyectos.append({
+            'id':    p['id'],
+            'fases': p['tl'],
+        })
+
+PLANNING_DATA = {
+    'semanas':   WEEK_LABELS,
+    'meses':     MONTHS,
+    'hoy':       TODAY_WEEK,
+    'proyectos': planning_proyectos,
+}
+
+META = {
+    'updated':    hoy.strftime('%d %b %Y'),
+    'hoy_semana': TODAY_WEEK,
+}
+
 # ── GENERAR DATA JS ───────────────────────────────────────────────────────────
 DATA_JS = f"""
-const WEEK_LABELS = {json.dumps(WEEK_LABELS)};
-const MONTHS = {json.dumps(MONTHS)};
-const TODAY_WEEK = {TODAY_WEEK};
-const WEEK_LABEL = 'Semana {hoy.strftime("%d %b %Y")}';
-const WEEK_STAMP = 'SEM {hoy.strftime("%d-%m-%Y")}';
-const UPDATED = 'Actualizado {hoy.strftime("%d %b %Y")}';
-const MASTER = {json.dumps(MASTER, ensure_ascii=False)};
+const MASTER_DATA = {json.dumps(MASTER_DATA, ensure_ascii=False)};
+const GLOBAL_DATA = {json.dumps(GLOBAL_DATA, ensure_ascii=False)};
+const PLANNING_DATA = {json.dumps(PLANNING_DATA, ensure_ascii=False)};
+const META = {json.dumps(META, ensure_ascii=False)};
 const ALERTAS = {json.dumps(ALERTAS_JSON, ensure_ascii=False)};
 const AGENDA = {json.dumps(AGENDA, ensure_ascii=False)};
 const MONTAJES = {json.dumps(MONTAJES, ensure_ascii=False)};
