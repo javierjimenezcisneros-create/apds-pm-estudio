@@ -91,22 +91,29 @@ def extract_planning(sheet_name):
     week_cols = {}   # col_index (0-based) → week_index
     header_idx = None
 
+    # Buscar fila de fechas (tiene dígitos en columnas >4) y fila de cabecera (col1=='PROYECTO')
+    dates_idx = None
     for i, row in enumerate(rows):
-        # Fila de cabecera: col1 == 'PROYECTO'
         if len(row) > 1 and str(row[1] or '').strip() == 'PROYECTO':
             header_idx = i
-            # Las semanas empiezan en col 6 (0-based): 1SEP, 8SEP, ...
+            # Las semanas: buscar en esta fila o en la anterior la fila con fechas
+            src_row = row
+            if dates_idx is not None:
+                src_row = rows[dates_idx]
             week_counter = 0
-            for j in range(6, len(row)):
-                c = row[j]
+            for j in range(5, len(src_row)):
+                c = src_row[j]
                 c_str = str(c or '').strip()
                 if c_str and any(ch.isdigit() for ch in c_str):
                     week_cols[j] = week_counter
-                    # Rellenar WEEK_LABELS dinámicamente si están vacías
                     if week_counter >= len(WEEK_LABELS):
                         WEEK_LABELS.append(c_str)
                     week_counter += 1
             break
+        # Detectar fila de fechas (ej: '28 SEP', '5 OCT'...)
+        date_count = sum(1 for c in row if c and any(ch.isdigit() for ch in str(c or '')) and any(ch.isalpha() for ch in str(c or '')))
+        if date_count >= 3:
+            dates_idx = i
 
     if not week_cols or header_idx is None:
         print(f"  ⚠ No se encontró cabecera en {sheet_name}")
