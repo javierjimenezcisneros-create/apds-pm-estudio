@@ -344,59 +344,202 @@ MONTAJES = ALE_MONTAJES if ALE_MONTAJES else []
 AGENDA = [{'when':a['when'],'text':f"{a['proj']} — {a['text']}"} for a in ALE_HITOS[:8]]
 VAC = {}
 
-# ── CONSTRUIR MASTER_DATA (formato que espera app.js) ─────────────────────────
-def make_id(nombre, dept):
-    """ID único: DEPT_NOMBRE_SIN_ESPACIOS"""
-    n = nombre.upper().replace(' ', '_').replace('-', '_')[:20]
-    d = (dept or '').upper().replace(' ', '')[:3]
-    return f"{d}_{n}" if d else n
+# ── ID ESTABLE: mismo algoritmo para las tres fuentes ─────────────────────────
+import re as _re
+def make_id(nombre):
+    """ID estable desde nombre: quitar número inicial, limpiar, snake_case.
+    Ej: '217 PASEO LAGOS 132' → 'paseo_lagos_132'
+        'PASEO LAGOS 132'     → 'paseo_lagos_132'
+    """
+    n = str(nombre or '').strip()
+    n = _re.sub(r'^\d+\s*', '', n)           # quitar número inicial
+    n = n.upper()
+    for a, b in [('Á','A'),('É','E'),('Í','I'),('Ó','O'),('Ú','U'),('Ñ','N'),
+                 ('À','A'),('È','E'),('Ì','I'),('Ò','O'),('Ù','U')]:
+        n = n.replace(a, b)
+    n = _re.sub(r'[^\w\s]', '', n)
+    n = _re.sub(r'\s+', '_', n.strip())
+    return n.lower()[:40]
 
-# Asignar IDs a cada proyecto
+# Asignar IDs al MASTER
 for p in MASTER:
-    p['id'] = make_id(p['nombre'], p['dept'])
+    p['id'] = make_id(p['nombre'])
 
-MASTER_DATA = [
-    {
-        'id':      p['id'],
-        'nombre':  p['nombre'],
-        'dpto':    p['dept'],
-        'equipo':  [r.strip() for r in
-                    str(p.get('resp','')).replace('/',' / ').replace('+',' / ').split('/')
-                    if r.strip() and len(r.strip()) > 1],
-        'estado':  p['estado'],
-        'hito':    p['hito'],
-        'fecha':   p['fecha'],
-        'bloqueador': p['bloqueador'],
-        'constructora': p['constructora'],
-        'fase':    p['fase'],
-        'atencion': p['atencion'],
-        'nivel':   p['nivel'],
-        'obs':     p['obs'],
-    }
-    for p in MASTER
-]
+# ── LEER GLOBAL (Master_Global.xlsx en el repo) ────────────────────────────────
+# Cols: PROYECTO | RESPONSABLE | FASE REAL | ACTIVIDAD ACTUAL | FECHA OBJETIVO |
+#       FIN OBRA | MONTAJE | ENTREGA | DECO CERRADA | PRESU. DECO | PEDIDOS |
+#       SITUACIÓN/BLOQUEADOR | ACCIÓN CONCRETA | CUÁNDO
+GLOBAL_EXCEL = os.path.join(BASE, 'Master_Global.xlsx')
+_global_raw = {}
+if os.path.exists(GLOBAL_EXCEL):
+    wb_g = openpyxl.load_workbook(GLOBAL_EXCEL, data_only=True)
+    ws_g = wb_g[wb_g.sheetnames[0]]
+    rows_g = list(ws_g.iter_rows(min_row=1, max_row=ws_g.max_row, max_col=15, values_only=True))
+    header_g = False
+    for row in rows_g:
+        if str(row[0] or '').strip() == 'PROYECTO':
+            header_g = True; continue
+        if not header_g: continue
+        n = str(row[0] or '').strip()
+        if not n or len(n) < 3: continue
+        if n.startswith(('▸','🔴','🟠','🟡','  ')): continue
+        gid = make_id(n)
+        _global_raw[gid] = {
+            'id':                  gid,
+            'fase_real':           str(row[2]  or '—').strip(),
+            'actividad_actual':    str(row[3]  or '—').strip(),
+            'fecha_hito':          str(row[4]  or '—').strip(),
+            'fin_obra':            str(row[5]  or '—').strip(),
+            'montaje':             str(row[6]  or '—').strip(),
+            'entrega':             str(row[7]  or '—').strip(),
+            'deco_cerrada':        str(row[8]  or '—').strip(),
+            'presupuesto_deco_aceptado': str(row[9] or '—').strip(),
+            'pedidos_confirmados': str(row[10] or '—').strip(),
+            'bloqueador':          str(row[11] or '').strip(),
+            'accion_concreta':     str(row[12] or '').strip(),
+            'cuando':              str(row[13] or '').strip(),
+        }
+    print(f"Global (Master_Global.xlsx): {len(_global_raw)} proyectos")
+else:
+    print("⚠ Master_Global.xlsx no encontrado — GLOBAL vacío")
 
-# GLOBAL_DATA: mismos proyectos con campos adicionales (constructora, fase, etc.)
-GLOBAL_DATA = [
-    {
-        'id':           p['id'],
+# ── LEER PLANNING (PLANNING_POMBO.xlsx en el repo) ────────────────────────────
+# Estructura: row1=estudio, row2=meses, row3=fechas, row4=cabecera, row5+=datos
+# Cols: DPTO | PROYECTO | RESPONSABLE | FASE | PRÓXIMO HITO | sem1 | sem2 | ...
+PLANNING_EXCEL = os.path.join(BASE, 'PLANNING_POMBO.xlsx')
+_planning_raw  = {}   # id → {fases: {week_idx: label}}
+_planning_cols = {}   # col_idx → week_idx
+_week_labels_p = []
+if os.path.exists(PLANNING_EXCEL):
+    wb_p = openpyxl.load_workbook(PLANNING_EXCEL, data_only=True)
+    ws_p = wb_p[wb_p.sheetnames[0]]
+    rows_p = list(ws_p.iter_rows(min_row=1, max_row=ws_p.max_row,
+                                  max_col=ws_p.max_column, values_only=True))
+    dates_idx_p = None
+    header_idx_p = None
+    for i, row in enumerate(rows_p):
+        if len(row) > 1 and str(row[1] or '').strip() == 'PROYECTO':
+            header_idx_p = i
+            src = rows_p[dates_idx_p] if dates_idx_p is not None else row
+            wc = 0
+            for j in range(5, len(src)):
+                c = str(src[j] or '').strip()
+                if c and any(ch.isdigit() for ch in c):
+                    _planning_cols[j] = wc
+                    _week_labels_p.append(c)
+                    wc += 1
+            break
+        date_count = sum(1 for c in row
+                         if c and any(ch.isdigit() for ch in str(c))
+                         and any(ch.isalpha() for ch in str(c)))
+        if date_count >= 3:
+            dates_idx_p = i
+
+    if header_idx_p is not None:
+        for row in rows_p[header_idx_p + 1:]:
+            if not row or len(row) < 2: continue
+            n = str(row[1] or '').strip()
+            if not n or len(n) < 2 or n.startswith('▸'): continue
+            if n.upper() in ('PROYECTO', 'VACACIONES'): continue
+            pid = make_id(n)
+            fases = {}
+            for col, idx in _planning_cols.items():
+                if col < len(row) and row[col] and str(row[col]).strip() not in {'','—','None'}:
+                    fases[idx] = str(row[col]).strip()
+            if fases:
+                _planning_raw[pid] = {
+                    'id':    pid,
+                    'dpto':  str(row[0] or '').strip(),
+                    'resp':  str(row[2] or '').strip(),
+                    'fase':  str(row[3] or '').strip(),
+                    'hito':  str(row[4] or '').strip(),
+                    'fases': fases,
+                }
+    print(f"Planning (PLANNING_POMBO.xlsx): {len(_planning_raw)} proyectos, {len(_week_labels_p)} semanas")
+    if _week_labels_p:
+        WEEK_LABELS = _week_labels_p
+else:
+    print("⚠ PLANNING_POMBO.xlsx no encontrado — usando PLANNING del master")
+
+# ── MASTER_DATA ────────────────────────────────────────────────────────────────
+MASTER_DATA = []
+for p in MASTER:
+    pid = p['id']
+    g   = _global_raw.get(pid, {})
+    MASTER_DATA.append({
+        'id':           pid,
+        'nombre':       p['nombre'],
+        'dpto':         p['dept'],
+        'equipo':       [r.strip() for r in
+                         str(p.get('resp','')).replace('/',' / ').replace('+',' / ').split('/')
+                         if r.strip() and len(r.strip()) > 1],
+        'estado':       p['estado'],
+        'hito':         p['hito'],
+        'fecha':        p['fecha'],
+        'bloqueador':   p['bloqueador'],
         'constructora': p['constructora'],
         'fase':         p['fase'],
         'atencion':     p['atencion'],
         'nivel':        p['nivel'],
         'obs':          p['obs'],
-    }
-    for p in MASTER
-]
+        # Campos de GLOBAL que el modal accede en proj. directamente
+        'fin_obra':     g.get('fin_obra', '—'),
+        'montaje':      g.get('montaje', '—'),
+        'entrega':      g.get('entrega', '—'),
+        'deco_cerrada': g.get('deco_cerrada', '—'),
+        'presupuesto_deco_aceptado': g.get('presupuesto_deco_aceptado', '—'),
+        'pedidos_confirmados': g.get('pedidos_confirmados', '—'),
+    })
 
-# PLANNING_DATA: {semanas, proyectos: [{id, fases:{0:"X",...}}]}
-planning_proyectos = []
+# ── GLOBAL_DATA (campos que app.js accede vía _g = globalOf(id)) ──────────────
+GLOBAL_DATA = []
 for p in MASTER:
-    if p.get('tl'):
-        planning_proyectos.append({
-            'id':    p['id'],
-            'fases': p['tl'],
-        })
+    pid = p['id']
+    g   = _global_raw.get(pid, {})
+    GLOBAL_DATA.append({
+        'id':              pid,
+        'atencion':        p['atencion'],        # nivel de atención (del MASTER)
+        'proximo_hito':    g.get('actividad_actual', p['hito']),  # lo que app busca
+        'fecha_hito':      g.get('fecha_hito', p['fecha']),
+        'bloqueador':      g.get('bloqueador', p['bloqueador']),
+        'obs':             g.get('accion_concreta', p['obs']),
+        'cuando':          g.get('cuando', ''),
+        'fase_real':       g.get('fase_real', p['fase']),
+        'fin_obra':        g.get('fin_obra', '—'),
+        'montaje':         g.get('montaje', '—'),
+        'entrega':         g.get('entrega', '—'),
+    })
+
+# ── PLANNING_DATA ──────────────────────────────────────────────────────────────
+planning_proyectos = []
+# Primero del PLANNING_POMBO
+for pid, pr in _planning_raw.items():
+    planning_proyectos.append({'id': pid, 'fases': pr['fases']})
+# Completar con los del MASTER que no estén ya
+ids_en_planning = {pr['id'] for pr in planning_proyectos}
+for p in MASTER:
+    if p['id'] not in ids_en_planning and p.get('tl'):
+        planning_proyectos.append({'id': p['id'], 'fases': p['tl']})
+
+# Recalcular TODAY_WEEK con las semanas del planning
+if _week_labels_p:
+    import datetime as _dt
+    def _parse_week(label):
+        parts = label.strip().split()
+        if len(parts) == 2:
+            meses = {'ENE':1,'FEB':2,'MAR':3,'ABR':4,'MAY':5,'JUN':6,
+                     'JUL':7,'AGO':8,'SEP':9,'OCT':10,'NOV':11,'DIC':12}
+            m = meses.get(parts[1].upper()[:3])
+            if m:
+                try: return _dt.date(2026, m, int(parts[0]))
+                except: pass
+        return None
+    fechas = [(_parse_week(l), i) for i, l in enumerate(_week_labels_p)]
+    fechas = [(f, i) for f, i in fechas if f]
+    if fechas:
+        hoy_date = _dt.date.today()
+        pasadas = [(f, i) for f, i in fechas if f <= hoy_date]
+        TODAY_WEEK = pasadas[-1][1] if pasadas else 0
 
 PLANNING_DATA = {
     'semanas':   WEEK_LABELS,
