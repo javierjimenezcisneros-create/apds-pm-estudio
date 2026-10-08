@@ -81,42 +81,47 @@ def extract_master():
     return projects
 
 # ── PLANNING (Gantt) ──────────────────────────────────────────────────────────
-# Nueva estructura: col0=Nº, col1=PROYECTO, col2=EQUIPO, col3=NOTAS,
-#                  col4=FIN EST., col5=RIESGO, col6..=semanas
+# Estructura Excel: row1=estudio, row2=meses, row3=cabecera (Nº|PROYECTO|...|1SEP|8SEP|...)
+#                  row4+=datos
 def extract_planning(sheet_name):
     if not sheet_name: return {}
     ws = wb[sheet_name]
     rows = list(ws.iter_rows(min_row=1, max_row=ws.max_row,
                               max_col=ws.max_column, values_only=True))
-    week_cols = {}   # col_index → week_index
+    week_cols = {}   # col_index (0-based) → week_index
     header_idx = None
 
     for i, row in enumerate(rows):
-        # Find the header row: col1 == 'PROYECTO'
+        # Fila de cabecera: col1 == 'PROYECTO'
         if len(row) > 1 and str(row[1] or '').strip() == 'PROYECTO':
             header_idx = i
-            # Weeks start at col 6 (0-based)
+            # Las semanas empiezan en col 6 (0-based): 1SEP, 8SEP, ...
+            week_counter = 0
             for j in range(6, len(row)):
                 c = row[j]
-                if c and isinstance(c, str) and any(ch.isdigit() for ch in str(c)):
-                    week_idx = j - 6   # 0=1SEP, 1=8SEP, ...
-                    if week_idx < len(WEEK_LABELS):
-                        week_cols[j] = week_idx
+                c_str = str(c or '').strip()
+                if c_str and any(ch.isdigit() for ch in c_str):
+                    week_cols[j] = week_counter
+                    # Rellenar WEEK_LABELS dinámicamente si están vacías
+                    if week_counter >= len(WEEK_LABELS):
+                        WEEK_LABELS.append(c_str)
+                    week_counter += 1
             break
 
     if not week_cols or header_idx is None:
         print(f"  ⚠ No se encontró cabecera en {sheet_name}")
         return {}
 
+    print(f"  {sheet_name}: cabecera en fila {header_idx+1}, {len(week_cols)} semanas")
+
     tl = {}
     for row in rows[header_idx + 1:]:
         if not row or len(row) < 2: continue
-        # Project name is in col 1
         n = row[1]
         if not n or not isinstance(n, str): continue
         n = n.strip()
         if len(n) < 2 or n.startswith('▸') or n.startswith('──'): continue
-        if n in ('VACACIONES', '🏖', 'PROYECTO'): continue
+        if n.upper() in ('VACACIONES', 'PROYECTO'): continue
 
         phases = {}
         for col, idx in week_cols.items():
@@ -127,17 +132,17 @@ def extract_planning(sheet_name):
     return tl
 
 # ── Extraer timelines ─────────────────────────────────────────────────────────
-# Hoja PLANNING unificada (nueva arquitectura)
-planning_sheet = find_sheet('PLANNING','Planning')
+# Intentar hoja PLANNING unificada primero
+planning_sheet = find_sheet('PLANNING')
 all_tl = extract_planning(planning_sheet) if planning_sheet else {}
 
-# Fallback: hojas antiguas separadas (compatibilidad con Excel viejo)
+# Hojas separadas por departamento (estructura actual del Excel)
 if not all_tl:
-    tl_viv  = extract_planning(find_sheet('VIVIENDA','Vivienda'))
-    tl_hot  = extract_planning(find_sheet('HOTELES','Hotel'))
-    tl_rest = extract_planning(find_sheet('RESTAURANTES','Restaurante','REST'))
+    tl_viv  = extract_planning(find_sheet('VIVIENDA'))
+    tl_hot  = extract_planning(find_sheet('HOTELES'))
+    tl_rest = extract_planning(find_sheet('RESTAURANTES'))
     all_tl  = {**tl_viv, **tl_hot, **tl_rest}
-    print(f"Timelines (hojas antiguas): VIV={len(tl_viv)} HOT={len(tl_hot)} REST={len(tl_rest)}")
+    print(f"Timelines: VIV={len(tl_viv)} HOT={len(tl_hot)} REST={len(tl_rest)} TOTAL={len(all_tl)}")
 else:
     print(f"Timelines (PLANNING): {len(all_tl)} proyectos")
 
