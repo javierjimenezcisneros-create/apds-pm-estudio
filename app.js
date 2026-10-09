@@ -245,10 +245,14 @@ function ganttCompleto(proj) {
   const dLastBase   = _parseSemLabel(lastBaseSem);
 
   // Añadir semanas sintéticas si targetDate supera el último label base
+  // Añadimos un margen de +6 días para incluir la semana que contiene targetDate
   let sems = [...baseSems];
-  if (targetDate && dLastBase && targetDate > dLastBase) {
-    const extra = _extraWeekLabels(lastBaseSem, targetDate);
-    sems = [...sems, ...extra];
+  if (targetDate && dLastBase) {
+    const targetPlusPadding = new Date(targetDate.getTime() + 6 * 24 * 3600 * 1000);
+    if (targetPlusPadding > dLastBase) {
+      const extra = _extraWeekLabels(lastBaseSem, targetPlusPadding);
+      sems = [...sems, ...extra];
+    }
   }
 
   const N    = sems.length;
@@ -651,12 +655,12 @@ function renderAlejandra() {
 
   html += `<div id="ale-alerta" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
     <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}&ensp;<span style="font-weight:300;color:var(--ink3);">${alerta.length}</span></div>
-    ${alerta.length ? alerta.map(p => projCard(p,{gantt:false})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
+    ${alerta.length ? alerta.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
   </div>`;
 
   html += `<div id="ale-atencion" class="panel" style="background:${BG_ATENCION};border-left:3px solid ${BORDE_ATENCION};">
     <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}&ensp;<span style="font-weight:300;color:var(--ink3);">${atencion.length}</span></div>
-    ${atencion.length ? atencion.map(p => projCard(p,{gantt:false})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
+    ${atencion.length ? atencion.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
   </div>`;
 
   if (estaSemana.length) {
@@ -770,7 +774,7 @@ function renderPersona(nombre) {
   if (prioridad.length) {
     html += `<div id="sec-PRIORIDAD" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
       <div class="panel-head">${tagHtml('tag-crit','● PRIORIDAD')}&ensp;<span style="font-weight:300;color:var(--ink3);">${prioridad.length}</span></div>
-      ${prioridad.map(p => projCard(p, {gantt:false})).join('')}
+      ${prioridad.map(p => projCard(p, {gantt:true})).join('')}
     </div>`;
   }
 
