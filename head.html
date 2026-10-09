@@ -165,10 +165,21 @@ details.collapse .inner{padding:0 14px 14px;}
 .btn-ghost:hover{border-color:var(--cop);color:var(--cop);}
 .btn-danger{font-family:var(--f);font-size:11px;padding:7px 14px;border-radius:2px;cursor:pointer;border:1px solid var(--crit-t);background:transparent;color:var(--crit);}
 
-/* ── MODAL ── */
-.modal-bg{position:fixed;inset:0;background:rgba(26,20,16,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
-.modal{background:var(--surface);border-radius:4px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(26,20,16,.22);overflow:hidden;}
-.modal-head{background:var(--burg);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;}
+/* ── MODAL BASE (genérico, pequeño) ── */
+.modal-bg{position:fixed;inset:0;background:rgba(26,20,16,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px);}
+.modal{background:var(--surface);border-radius:4px;width:min(96vw,480px);max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(26,20,16,.22);}
+/* modal-ficha: VER PROYECTO — ocupa 88% ancho × 88% alto */
+.modal-ficha{
+  width:88vw !important;
+  max-width:88vw !important;
+  min-width:min(88vw,640px) !important;
+  min-height:82vh;
+  max-height:88vh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.modal-head{background:var(--burg);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .modal-title{font-size:10.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);}
 .modal-sub{font-size:10px;font-weight:300;letter-spacing:.06em;color:rgba(194,105,66,.6);margin-top:2px;}
 .modal-close{background:none;border:none;color:rgba(194,105,66,.6);font-size:20px;cursor:pointer;padding:0 2px;line-height:1;}
@@ -176,7 +187,7 @@ details.collapse .inner{padding:0 14px 14px;}
 .modal-body{padding:18px;}
 .modal-body textarea{width:100%;min-height:90px;resize:vertical;font-family:var(--f);font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;line-height:1.5;}
 .modal-body textarea:focus{outline:none;border-color:var(--cop);}
-.modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;align-items:center;}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;align-items:center;flex-shrink:0;}
 .modal-foot .left{margin-right:auto;}
 
 /* ── SEMANAS CRÍTICAS ── */
