@@ -433,38 +433,120 @@ function ganttGeneral(proj) {
 }
 
 /* ── Gantt completo (en el modal) ────────────────────────── */
+
+/* Parsea etiquetas de fecha del Master como "30 oct'26", "Dic'26", "Ene'27", "TBD", "—"
+   Devuelve un Date o null. */
+function _parseFechaProyecto(str) {
+  if (!str || str === '—' || str.toLowerCase() === 'tbd') return null;
+  const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+  // "30 oct'26" → día 30, oct, 2026
+  let m = str.match(/(\d{1,2})\s+([a-záéíóú]{3})'(\d{2})/i);
+  if (m) {
+    const mes = MESES[m[2].toLowerCase()];
+    if (mes !== undefined) return new Date(2000 + parseInt(m[3]), mes, parseInt(m[1]));
+  }
+  // "Dic'26" → día 1, dic, 2026
+  m = str.match(/([a-záéíóú]{3})'(\d{2})/i);
+  if (m) {
+    const mes = MESES[m[1].toLowerCase()];
+    if (mes !== undefined) return new Date(2000 + parseInt(m[2]), mes, 1);
+  }
+  return null;
+}
+
+/* Parsea un label de semana como "5 OCT", "28 DIC", "3 ENE" → Date (lunes de esa semana, año actual/siguiente) */
+function _parseSemLabel(label) {
+  const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+  const m = label.match(/(\d{1,2})\s+([a-záéíóú]{2,3})/i);
+  if (!m) return null;
+  const mes = MESES[m[2].toLowerCase()];
+  if (mes === undefined) return null;
+  const hoyYear = new Date().getFullYear();
+  // Si el mes ya pasó respecto a hoy, probablemente es el año siguiente
+  const d1 = new Date(hoyYear, mes, parseInt(m[1]));
+  const d2 = new Date(hoyYear + 1, mes, parseInt(m[1]));
+  // Usar el año más cercano a la fecha actual que sea >= 3 meses antes de hoy
+  const refDate = new Date(); refDate.setMonth(refDate.getMonth() - 3);
+  return d1 >= refDate ? d1 : d2;
+}
+
+/* Genera labels de semanas adicionales a partir de la última semana conocida hasta targetDate */
+function _extraWeekLabels(lastLabel, targetDate) {
+  const MNAMES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  let cur = _parseSemLabel(lastLabel);
+  if (!cur) return [];
+  const extra = [];
+  cur = new Date(cur.getTime() + 7 * 24 * 3600 * 1000); // siguiente semana
+  let safety = 0;
+  while (cur <= targetDate && safety < 52) {
+    extra.push(`${cur.getDate()} ${MNAMES[cur.getMonth()]}`);
+    cur = new Date(cur.getTime() + 7 * 24 * 3600 * 1000);
+    safety++;
+  }
+  return extra;
+}
+
 function ganttCompleto(proj) {
-  const sems = PLANNING_DATA?.semanas || [];
-  const hoy  = hoySemana();
-  if (!sems.length) return '<p style="color:var(--ink3);font-size:12px;">Sin datos de planning.</p>';
+  const baseSems = PLANNING_DATA?.semanas || [];
+  const hoy      = hoySemana();
+  if (!baseSems.length) return '<p style="color:var(--ink3);font-size:12px;">Sin datos de planning.</p>';
 
-  const N = sems.length;
+  // Calcular horizonte: max(fin_obra, montaje) del proyecto
+  const dFinObra  = _parseFechaProyecto(proj.fin_obra  || '');
+  const dMontaje  = _parseFechaProyecto(proj.montaje   || '');
+  let targetDate = null;
+  if (dFinObra && dMontaje) targetDate = dFinObra > dMontaje ? dFinObra : dMontaje;
+  else targetDate = dFinObra || dMontaje;
+
+  // Último label del planning base
+  const lastBaseSem = baseSems[baseSems.length - 1];
+  const dLastBase   = _parseSemLabel(lastBaseSem);
+
+  // Añadir semanas sintéticas si targetDate supera el último label base
+  let sems = [...baseSems];
+  if (targetDate && dLastBase && targetDate > dLastBase) {
+    const extra = _extraWeekLabels(lastBaseSem, targetDate);
+    sems = [...sems, ...extra];
+  }
+
+  const N    = sems.length;
   const colW = `repeat(${N},minmax(28px,1fr))`;
+  const minW = `${N * 30}px`; // para forzar scroll horizontal
 
-  let weeksHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;margin-bottom:2px;">`;
+  let weeksHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;margin-bottom:2px;min-width:${minW};">`;
   sems.forEach(sem => {
     const isHoy = sem === hoy;
+    const isSynt = !baseSems.includes(sem); // semana sintética (fuera del planning)
     weeksHtml += `<div style="font-size:8.5px;font-weight:${isHoy?700:500};letter-spacing:.02em;
       text-align:center;padding:3px 1px;
-      color:${isHoy?'var(--burg)':'var(--ink3)'};
+      color:${isHoy?'var(--burg)':isSynt?'var(--ink3)':'var(--ink3)'};
+      opacity:${isSynt?0.55:1};
       border-bottom:${isHoy?'2px solid var(--burg)':'1px solid transparent'};">${sem}</div>`;
   });
   weeksHtml += '</div>';
 
-  let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;">`;
+  let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;min-width:${minW};">`;
   sems.forEach(sem => {
     const entry = (proj._p?.timeline||[]).find(t => t.semana === sem);
     const texto = entry?.actividades?.[0]?.texto || '';
     const ph    = texto ? faseColor(texto) : '';
+    const isSynt = !baseSems.includes(sem);
     const cls   = `gantt-cell${ph?' '+ph+' filled':''}${sem===hoy?' gantt-cell-hoy':''}`;
     cellsHtml  += `<div class="${cls}" title="${sem}${texto?': '+texto:''}"
-      style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;">
+      style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;${isSynt&&!texto?'background:rgba(0,0,0,.02);':''}"  >
       ${texto?`<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${abrev(texto)}</span>`:''}
     </div>`;
   });
   cellsHtml += '</div>';
 
-  return `<div style="overflow-x:auto;padding-bottom:4px;">${weeksHtml}${cellsHtml}</div>`;
+  const note = targetDate && sems.length > baseSems.length
+    ? `<div style="font-size:9px;color:var(--ink3);margin-top:6px;opacity:.7;">
+        * Semanas extendidas hasta ${targetDate.toLocaleDateString('es-ES',{month:'short',year:'numeric'})}
+        (${dFinObra&&dMontaje?'max(fin obra, montaje)':dFinObra?'fin de obra previsto':'montaje previsto'})
+       </div>`
+    : '';
+
+  return `<div style="overflow-x:auto;padding-bottom:4px;">${weeksHtml}${cellsHtml}${note}</div>`;
 }
 
 function _planningLegend() {
@@ -568,7 +650,7 @@ function openModal(id) {
 
   const html = `
     <div class="modal-bg" id="modal-bg">
-      <div class="modal" style="width:min(95vw,1100px);max-height:92vh;display:flex;flex-direction:column;">
+      <div class="modal modal-ficha">
 
         <div class="modal-head">
           <div style="flex:1;min-width:0;">
@@ -582,7 +664,7 @@ function openModal(id) {
           <button class="modal-close" id="modal-close">×</button>
         </div>
 
-        <div class="modal-body" style="overflow-y:auto;flex:1;padding:0 24px 16px;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
+        <div class="modal-body" style="overflow-y:auto;flex:1;padding:0 24px 16px;display:grid;grid-template-columns:minmax(280px,2fr) minmax(320px,3fr);gap:0 24px;min-height:0;">
 
           <!-- COL IZQ -->
           <div>
