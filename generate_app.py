@@ -569,15 +569,36 @@ for p in _all_projects:
     })
 
 # ── PLANNING_DATA ──────────────────────────────────────────────────────────────
+# app.js espera: proyectos[].timeline = [{semana: "6 OCT", actividades:[{texto:"OBRA"}]}, ...]
+# Los índices numéricos en _planning_raw.fases se convierten a etiquetas de semana.
+
+def fases_to_timeline(fases_dict, week_labels):
+    """Convierte {week_idx: label} → [{semana: week_label, actividades:[{texto:label}]}]"""
+    tl = []
+    for idx, label in fases_dict.items():
+        try:
+            i = int(idx)
+            if 0 <= i < len(week_labels):
+                tl.append({'semana': week_labels[i], 'actividades': [{'texto': str(label)}]})
+        except (ValueError, TypeError):
+            pass
+    return tl
+
 planning_proyectos = []
 # Primero del PLANNING_POMBO
 for pid, pr in _planning_raw.items():
-    planning_proyectos.append({'id': pid, 'fases': pr['fases']})
-# Completar con los del MASTER que no estén ya
+    tl = fases_to_timeline(pr['fases'], WEEK_LABELS)
+    if tl:
+        planning_proyectos.append({'id': pid, 'timeline': tl})
+# Completar con los del MASTER que no estén ya (tl es {nombre_semana: label})
 ids_en_planning = {pr['id'] for pr in planning_proyectos}
 for p in MASTER:
     if p['id'] not in ids_en_planning and p.get('tl'):
-        planning_proyectos.append({'id': p['id'], 'fases': p['tl']})
+        # tl del MASTER viene del extract_planning, que ya usa nombre de semana como clave
+        tl = [{'semana': sem, 'actividades': [{'texto': str(lbl)}]}
+              for sem, lbl in p['tl'].items() if sem and lbl]
+        if tl:
+            planning_proyectos.append({'id': p['id'], 'timeline': tl})
 
 # Recalcular TODAY_WEEK con las semanas del planning
 if _week_labels_p:
@@ -606,9 +627,13 @@ PLANNING_DATA = {
     'proyectos': planning_proyectos,
 }
 
+# hoy_semana debe ser el LABEL de la semana actual (string), no el índice numérico.
+# app.js hace sems.indexOf(hoySemana()) — necesita el mismo string que está en WEEK_LABELS.
+HOY_SEMANA_LABEL = WEEK_LABELS[TODAY_WEEK] if 0 <= TODAY_WEEK < len(WEEK_LABELS) else ''
+
 META = {
     'updated':    hoy.strftime('%d %b %Y'),
-    'hoy_semana': TODAY_WEEK,
+    'hoy_semana': HOY_SEMANA_LABEL,
 }
 
 # ── GENERAR DATA JS ───────────────────────────────────────────────────────────
