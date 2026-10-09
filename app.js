@@ -1,7 +1,6 @@
 /* ============================================================
    POMBO ESTUDIO — app.js
    Usa MASTER_DATA, GLOBAL_DATA, PLANNING_DATA, META
-   IDs de DOM: #view, #tabs, #export-btn, #week-badge, #update-badge
    ============================================================ */
 
 /* ── localStorage ─────────────────────────────────────────── */
@@ -28,19 +27,20 @@ function enrich(p) {
 }
 
 /* ── Semanas ──────────────────────────────────────────────── */
+// META.hoy_semana es el label string de la semana actual (p.ej. "5 OCT")
 const hoySemana = () => META?.hoy_semana || '';
-const VENTANA   = 13; // semana anterior + actual + 11 siguientes
+const VENTANA   = 6; // semanas hacia adelante en la tarjeta
 
 function semanaWindow() {
   const sems = PLANNING_DATA?.semanas || [];
   const i    = sems.indexOf(hoySemana());
-  const from = Math.max(0, i - 1);
-  return sems.slice(from, from + VENTANA);
+  if (i < 0) return sems.slice(0, VENTANA);
+  return sems.slice(i, i + VENTANA);
 }
 
 /* ── Personas ─────────────────────────────────────────────── */
-// Javier y Alejandra tienen pestañas fijas. Alicia excluida siempre.
-const EXCLUIR_PERSONAS = ['Alicia', 'Javier', 'Alejandra'];
+// Javier, Alejandra y Alicia no aparecen en las pestañas del equipo
+const EXCLUIR_PERSONAS = ['Alicia', 'Javier', 'Alejandra', 'Javi', 'alicia'];
 
 function getPersonas() {
   const s = new Set();
@@ -54,9 +54,8 @@ function getPersonas() {
 }
 
 /* ── Nivel de atención ────────────────────────────────────── */
-// 0=ALERTA  1=ATENCIÓN  2=INFO FALTANTE  3=CONTROLADO
 function atLevel(proj) {
-  const a = (proj._g?.atencion || '').toUpperCase();
+  const a = (proj._g?.atencion || proj.atencion || '').toUpperCase();
   if (a.includes('MÁXIMA') || a.includes('MAXIMA')) return 0;
   if (a.includes('ALTA'))                            return 1;
   if (a.includes('SEGUIMIENTO'))                     return 2;
@@ -89,38 +88,49 @@ function tagHtml(cls, txt) {
 function abrev(txt) {
   if (!txt) return '';
   const t = txt.toUpperCase();
-  if (t.includes('PROY') || t.includes('ANTEPR')) return 'PRY';
+  if (t.includes('ANTEPR'))  return 'APY';
+  if (t.includes('PROY'))    return 'PRY';
+  if (t.includes('VALORAC')) return 'VAL';
   if (t.includes('OBRA'))    return 'OBR';
   if (t.includes('MONTAJ'))  return 'MNT';
   if (t.includes('ENTREGA')) return 'ENT';
   if (t.includes('RENDER'))  return 'RND';
   if (t.includes('VISITA'))  return 'VIS';
   if (t.includes('PEDIDO'))  return 'PED';
-  if (t.includes('PARAD') || t.includes('ESPERA')) return '···';
+  if (t.includes('REMATE'))  return 'REM';
+  if (t.includes('PARAD') || t.includes('ESPERA') || t.includes('STANDBY')) return '···';
   return txt.slice(0,3).toUpperCase();
 }
 
-// Colores coherentes con la codificación del Planning Excel:
-// ph1=proyecto/diseño  ph2=obra  ph3=montaje  ph4=entrega
-// ph5=renders  ph6=visita  ph7=pedidos  ph9=parada/espera
+// Colores coherentes con PLANNING_POMBO
 function faseColor(txt) {
   const t = (txt||'').toUpperCase();
-  if (t.includes('PROY') || t.includes('ANTEPR') || t.includes('DISEÑO')) return 'ph1';
+  if (t.includes('ANTEPR'))  return 'ph1';
+  if (t.includes('PROY') || t.includes('DISEÑO') || t.includes('VALORAC')) return 'ph1';
   if (t.includes('OBRA'))    return 'ph2';
   if (t.includes('MONTAJ'))  return 'ph3';
   if (t.includes('ENTREGA')) return 'ph4';
   if (t.includes('RENDER'))  return 'ph5';
   if (t.includes('VISITA'))  return 'ph6';
-  if (t.includes('PEDIDO'))  return 'ph7';
+  if (t.includes('PEDIDO') || t.includes('REMATE')) return 'ph7';
   if (t.includes('PARAD') || t.includes('ESPERA') || t.includes('STANDBY')) return 'ph9';
   return 'ph1';
 }
 
 function row2(k, v) {
+  if (!v || v === '—' || v === 'None') return '';
   return `<tr>
     <td style="color:var(--ink3);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
-               padding:4px 0;width:115px;vertical-align:top;">${k}</td>
+               padding:4px 0;width:130px;vertical-align:top;">${k}</td>
     <td style="padding:4px 0;font-size:12.5px;">${v}</td>
+  </tr>`;
+}
+
+function row2Always(k, v) {
+  return `<tr>
+    <td style="color:var(--ink3);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+               padding:4px 0;width:130px;vertical-align:top;">${k}</td>
+    <td style="padding:4px 0;font-size:12.5px;color:${(!v||v==='—')?'var(--ink3)':'inherit'};">${v||'Sin fecha registrada'}</td>
   </tr>`;
 }
 
@@ -138,7 +148,7 @@ function projHasActivityInWindow(proj, startOffset, endOffset) {
   return (proj._p?.timeline||[]).some(t => win.includes(t.semana));
 }
 
-/* ── Gantt general (ventana operativa) ───────────────────── */
+/* ── Gantt tarjeta (ventana operativa compacta) ──────────── */
 function ganttGeneral(proj) {
   const ventana = semanaWindow();
   const hoy     = hoySemana();
@@ -146,7 +156,8 @@ function ganttGeneral(proj) {
 
   let weeksHtml = '<div class="gantt-weeks">';
   ventana.forEach(sem => {
-    weeksHtml += `<div class="gantt-week${sem===hoy?' gantt-week-hoy':''}">${sem.split('/')[0]}</div>`;
+    const isHoy = sem === hoy;
+    weeksHtml += `<div class="gantt-week${isHoy?' gantt-week-hoy':''}" style="font-size:9px;">${sem}</div>`;
   });
   weeksHtml += '</div>';
 
@@ -163,30 +174,34 @@ function ganttGeneral(proj) {
   return `<div class="gantt" style="overflow-x:auto;">${weeksHtml}${cellsHtml}</div>`;
 }
 
-/* ── Gantt completo (modal ampliado) ─────────────────────── */
+/* ── Gantt completo (en el modal) ────────────────────────── */
 function ganttCompleto(proj) {
   const sems = PLANNING_DATA?.semanas || [];
   const hoy  = hoySemana();
   if (!sems.length) return '<p style="color:var(--ink3);font-size:12px;">Sin datos de planning.</p>';
 
   const N = sems.length;
-  const colW = 'minmax(30px,1fr)';
+  const colW = `repeat(${N},minmax(28px,1fr))`;
 
-  let weeksHtml = `<div style="display:grid;grid-template-columns:repeat(${N},${colW});gap:1px;margin-bottom:2px;">`;
+  let weeksHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;margin-bottom:2px;">`;
   sems.forEach(sem => {
-    weeksHtml += `<div style="font-size:9px;font-weight:600;letter-spacing:.04em;text-align:center;
-                              padding:2px 0;color:${sem===hoy?'var(--burg)':'var(--ink3)'};">${sem.split('/')[0]}</div>`;
+    const isHoy = sem === hoy;
+    weeksHtml += `<div style="font-size:8.5px;font-weight:${isHoy?700:500};letter-spacing:.02em;
+      text-align:center;padding:3px 1px;
+      color:${isHoy?'var(--burg)':'var(--ink3)'};
+      border-bottom:${isHoy?'2px solid var(--burg)':'1px solid transparent'};">${sem}</div>`;
   });
   weeksHtml += '</div>';
 
-  let cellsHtml = `<div style="display:grid;grid-template-columns:repeat(${N},${colW});gap:1px;">`;
+  let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;">`;
   sems.forEach(sem => {
     const entry = (proj._p?.timeline||[]).find(t => t.semana === sem);
     const texto = entry?.actividades?.[0]?.texto || '';
     const ph    = texto ? faseColor(texto) : '';
     const cls   = `gantt-cell${ph?' '+ph+' filled':''}${sem===hoy?' gantt-cell-hoy':''}`;
-    cellsHtml  += `<div class="${cls}" title="${sem}${texto?': '+texto:''}" style="height:28px;display:flex;align-items:center;justify-content:center;">
-      ${texto?`<span class="gantt-label" style="font-size:9px;">${abrev(texto)}</span>`:''}
+    cellsHtml  += `<div class="${cls}" title="${sem}${texto?': '+texto:''}"
+      style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;">
+      ${texto?`<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${abrev(texto)}</span>`:''}
     </div>`;
   });
   cellsHtml += '</div>';
@@ -194,20 +209,35 @@ function ganttCompleto(proj) {
   return `<div style="overflow-x:auto;padding-bottom:4px;">${weeksHtml}${cellsHtml}</div>`;
 }
 
+function _planningLegend() {
+  const items = [
+    ['ph1','Proyecto/Diseño'],['ph2','Obra'],['ph3','Montaje'],['ph4','Entrega'],
+    ['ph5','Renders'],['ph6','Visita'],['ph7','Pedidos/Remates'],['ph9','Parada'],
+  ];
+  return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
+    ${items.map(([cls,lbl]) =>
+      `<div style="display:flex;align-items:center;gap:5px;">
+         <div class="gantt-cell ${cls} filled" style="width:16px;height:12px;border-radius:2px;"></div>
+         <span style="font-size:9.5px;color:var(--ink3);">${lbl}</span>
+       </div>`
+    ).join('')}
+  </div>`;
+}
+
 /* ── Tarjeta de proyecto ─────────────────────────────────── */
 function projCard(proj, opts={}) {
   const g    = proj._g;
   const [dCls, dTxt] = deptTag(proj.dpto);
-  const [rCls, rTxt] = riskTag(g?.atencion);
-  const hito  = g?.proximo_hito || '';
-  const fecha = g?.fecha_hito   || '';
-  const bloq  = g?.bloqueador   || '';
-  const equipo = (proj.equipo||[]).join(' · ');
+  const [rCls, rTxt] = riskTag(g?.atencion || proj.atencion);
+  const hito  = g?.proximo_hito || proj.hito || '';
+  const fecha = g?.fecha_hito   || proj.fecha || '';
+  const bloq  = g?.bloqueador   || proj.bloqueador || '';
+  const equipo = (proj.equipo||[]).filter(e => e && e.length > 1).join(' · ');
 
-  const hitoHtml = hito
-    ? `<div class="hito-row"><span class="hito-text">${hito}</span>${fecha?`<span class="hito-date">${fecha}</span>`:''}</div>`
+  const hitoHtml = hito && hito !== '—'
+    ? `<div class="hito-row"><span class="hito-text">${hito}</span>${fecha&&fecha!=='—'?`<span class="hito-date">${fecha}</span>`:''}</div>`
     : '';
-  const bloqHtml = bloq
+  const bloqHtml = bloq && bloq !== '—'
     ? `<div style="font-size:11.5px;color:var(--crit);margin:4px 0 2px;">⚠ ${bloq}</div>`
     : '';
   const equipoHtml = equipo
@@ -220,13 +250,12 @@ function projCard(proj, opts={}) {
       <div style="flex:1;min-width:0;">
         <div class="proj-tags" style="margin-bottom:5px;">
           ${tagHtml(dCls,dTxt)} ${tagHtml(rCls,rTxt)}
-          ${proj.fase?`<span class="tag tag-out" style="font-size:10px;">${proj.fase}</span>`:''}
+          ${proj.fase&&proj.fase!=='—'?`<span class="tag tag-out" style="font-size:10px;">${proj.fase}</span>`:''}
         </div>
         <div class="proj-name" style="cursor:pointer;" data-open="${proj.id}">${proj.nombre}</div>
       </div>
-      <button class="btn-ghost" data-open="${proj.id}"
-              style="font-size:11px;padding:4px 10px;white-space:nowrap;flex-shrink:0;">
-        VER →
+      <button class="btn-ver" data-open="${proj.id}">
+        VER PROYECTO →
       </button>
     </div>
     ${hitoHtml}${bloqHtml}${equipoHtml}
@@ -234,7 +263,7 @@ function projCard(proj, opts={}) {
   </div>`;
 }
 
-/* ── Modal de proyecto ───────────────────────────────────── */
+/* ── Modal unificado: ficha completa + planning ──────────── */
 let _modalId = null;
 
 function openModal(id) {
@@ -244,79 +273,99 @@ function openModal(id) {
   const proj = enrich(raw);
   const g    = proj._g;
 
-  const equipoHtml = (proj.equipo||[])
+  const equipoHtml = (proj.equipo||[]).filter(e => e && e.length > 1)
     .map(e => `<span class="tag tag-out">${e}</span>`).join(' ');
 
-  const hasDeco = proj.deco_cerrada || proj.presupuesto_deco_aceptado || proj.pedidos_confirmados;
-  const decoHtml = hasDeco ? `
+  // Sección DECO
+  const decoItems = [
+    ['Deco cerrada',     proj.deco_cerrada],
+    ['Ppto. aceptado',   proj.presupuesto_deco_aceptado],
+    ['Pedidos',          proj.pedidos_confirmados],
+  ].filter(([,v]) => v && v !== '—' && v !== 'None');
+
+  const decoHtml = decoItems.length ? `
     <div class="modal-section">
-      <div class="modal-section-label">Deco</div>
+      <div class="modal-section-label" style="color:var(--viv-dk,#5a7a3a);">
+        ▸ DECO
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <span class="tag ${proj.deco_cerrada==='SÍ'?'tag-baj':'tag-out'}">Deco cerrada: ${proj.deco_cerrada||'—'}</span>
-        <span class="tag ${proj.presupuesto_deco_aceptado==='SÍ'?'tag-baj':'tag-out'}">Ppto aceptado: ${proj.presupuesto_deco_aceptado||'—'}</span>
-        <span class="tag ${proj.pedidos_confirmados==='SÍ'?'tag-baj':'tag-out'}">Pedidos: ${proj.pedidos_confirmados||'—'}</span>
+        ${decoItems.map(([k,v]) =>
+          `<span class="tag ${v==='SÍ'||v==='Sí'?'tag-baj':'tag-out'}">${k}: ${v}</span>`
+        ).join('')}
       </div>
     </div>` : '';
 
+  // Sección FECHAS
+  const fechasHtml = `
+    <div class="modal-section">
+      <div class="modal-section-label">▸ FECHAS IMPORTANTES</div>
+      <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+        ${row2Always('Fin de obra previsto', proj.fin_obra)}
+        ${row2Always('Montaje previsto',     proj.montaje)}
+        ${row2Always('Fin oficial',          proj.entrega || proj.fin_oficial)}
+        ${row2Always('Próximo hito',         g?.proximo_hito || proj.hito)}
+        ${row2Always('Fecha del hito',       g?.fecha_hito || proj.fecha)}
+      </table>
+    </div>`;
+
   const html = `
     <div class="modal-bg" id="modal-bg">
-      <div class="modal" style="width:min(92vw,820px);max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal" style="width:min(95vw,1100px);max-height:92vh;display:flex;flex-direction:column;">
+
         <div class="modal-head">
           <div style="flex:1;min-width:0;">
             <div class="modal-title">${proj.nombre}</div>
-            <div class="modal-sub" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
               ${tagHtml(...deptTag(proj.dpto))}
-              ${tagHtml(...riskTag(g?.atencion))}
-              ${proj.fase?`<span class="tag tag-out" style="font-size:10px;">${proj.fase}</span>`:''}
+              ${tagHtml(...riskTag(g?.atencion||proj.atencion))}
+              ${proj.fase&&proj.fase!=='—'?`<span class="tag tag-out" style="font-size:10px;">${proj.fase}</span>`:''}
             </div>
           </div>
           <button class="modal-close" id="modal-close">×</button>
         </div>
 
-        <div class="modal-body" style="overflow-y:auto;flex:1;padding:0 24px 8px;">
+        <div class="modal-body" style="overflow-y:auto;flex:1;padding:0 24px 16px;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
 
-          <!-- IDENTIDAD -->
-          <div class="modal-section">
-            <div class="modal-section-label">Equipo</div>
-            <div>${equipoHtml || '<span style="color:var(--ink3);font-size:12px;">Sin equipo asignado</span>'}</div>
-            <table style="width:100%;font-size:12.5px;border-collapse:collapse;margin-top:6px;">
-              ${row2('Estado', proj.estado||'—')}
-              ${row2('Constructora', proj.constructora||'—')}
-            </table>
+          <!-- COL IZQ -->
+          <div>
+            <!-- IDENTIDAD -->
+            <div class="modal-section">
+              <div class="modal-section-label">▸ IDENTIDAD</div>
+              <div style="margin-bottom:8px;">${equipoHtml || '<span style="color:var(--ink3);font-size:12px;">Sin equipo asignado</span>'}</div>
+              <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+                ${row2('Estado', proj.estado)}
+                ${row2('Constructora', proj.constructora)}
+                ${row2('Fase', proj.fase)}
+              </table>
+            </div>
+
+            <!-- ESTADO Y SEGUIMIENTO GLOBAL -->
+            <div class="modal-section">
+              <div class="modal-section-label">▸ SEGUIMIENTO GLOBAL</div>
+              ${(g?.bloqueador&&g.bloqueador!=='—')?`<div style="color:var(--crit);font-size:12.5px;font-weight:500;margin-bottom:8px;padding:6px 8px;background:rgba(180,30,30,.06);border-radius:4px;">⚠ ${g.bloqueador}</div>`:''}
+              <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+                ${row2('Próximo hito',  g?.proximo_hito || proj.hito)}
+                ${row2('Fecha hito',    g?.fecha_hito || proj.fecha)}
+                ${row2('Fase real',     g?.fase_real)}
+                ${row2('Acción',        g?.obs || proj.obs)}
+                ${row2('Cuándo',        g?.cuando)}
+              </table>
+            </div>
+
+            <!-- DECO -->
+            ${decoHtml}
+
+            <!-- FECHAS -->
+            ${fechasHtml}
           </div>
 
-          <!-- GLOBAL -->
-          <div class="modal-section">
-            <div class="modal-section-label">Global</div>
-            ${g?.bloqueador?`<div style="color:var(--crit);font-size:12.5px;font-weight:500;margin-bottom:8px;">⚠ ${g.bloqueador}</div>`:''}
-            <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
-              ${row2('Próximo hito', g?.proximo_hito||'—')}
-              ${row2('Fecha hito',   g?.fecha_hito||'—')}
-              ${g?.obs?row2('Observaciones', g.obs):''}
-            </table>
-          </div>
-
-          <!-- DECO -->
-          ${decoHtml}
-
-          <!-- FECHAS -->
-          <div class="modal-section">
-            <div class="modal-section-label">Fechas</div>
-            <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
-              ${row2('Fin obra',     proj.fin_obra||'—')}
-              ${row2('Montaje',      proj.montaje||'—')}
-              ${row2('Fin oficial',  proj.fin_oficial||'—')}
-            </table>
-          </div>
-
-          <!-- PLANNING -->
-          <div class="modal-section" id="modal-planning-section">
-            <div class="modal-section-label">Planning</div>
-            <div style="margin-bottom:10px;">${ganttGeneral(proj)}</div>
-            <button class="btn-primary" id="btn-planning-completo"
-                    style="font-size:12px;padding:8px 18px;letter-spacing:.06em;">
-              VER PLANNING COMPLETO →
-            </button>
+          <!-- COL DER: PLANNING COMPLETO -->
+          <div style="border-left:1px solid var(--line);padding-left:20px;">
+            <div class="modal-section" style="border-bottom:none;height:100%;">
+              <div class="modal-section-label">▸ PLANNING COMPLETO</div>
+              ${ganttCompleto(proj)}
+              ${_planningLegend()}
+            </div>
           </div>
 
         </div>
@@ -330,105 +379,23 @@ function openModal(id) {
   document.getElementById('modal-bg')?.remove();
   document.body.insertAdjacentHTML('beforeend', html);
 
-  document.getElementById('modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('modal-close')?.addEventListener('click',  closeModal);
   document.getElementById('modal-close2')?.addEventListener('click', closeModal);
   document.getElementById('modal-bg')?.addEventListener('click', e => {
     if (e.target.id === 'modal-bg') closeModal();
-  });
-
-  // VER PLANNING COMPLETO → abre modal secundario de ancho máximo
-  document.getElementById('btn-planning-completo')?.addEventListener('click', () => {
-    openPlanningModal(proj);
   });
 }
 
 function closeModal() {
   document.getElementById('modal-bg')?.remove();
-  document.getElementById('planning-modal-bg')?.remove();
   _modalId = null;
 }
 
-/* ── Modal de planning completo (pantalla grande) ─────────── */
-function openPlanningModal(proj) {
-  const g    = proj._g;
-  const html = `
-    <div id="planning-modal-bg" style="
-      position:fixed;inset:0;z-index:1100;
-      background:rgba(0,0,0,.72);
-      display:flex;align-items:center;justify-content:center;
-      padding:20px;">
-      <div style="
-        background:var(--paper);
-        border-radius:8px;
-        width:min(96vw,1200px);
-        max-height:88vh;
-        display:flex;flex-direction:column;
-        box-shadow:0 20px 60px rgba(0,0,0,.4);">
-        <div style="
-          display:flex;align-items:center;justify-content:space-between;
-          padding:18px 24px 14px;
-          border-bottom:1px solid var(--line);">
-          <div>
-            <div style="font-size:13px;font-weight:700;letter-spacing:.04em;">${proj.nombre}</div>
-            <div style="font-size:11px;color:var(--ink3);margin-top:2px;">
-              Planning completo
-              ${proj.fin_obra||proj.montaje ? '· Horizonte hasta '+(proj.montaje||proj.fin_obra) : ''}
-            </div>
-          </div>
-          <button id="planning-modal-close" style="
-            background:none;border:none;cursor:pointer;
-            font-size:22px;color:var(--ink2);padding:4px 10px;line-height:1;">×</button>
-        </div>
-        <div style="overflow:auto;flex:1;padding:18px 24px 20px;">
-          ${ganttCompleto(proj)}
-          ${_planningLegend()}
-        </div>
-        <div style="
-          padding:12px 24px;border-top:1px solid var(--line);
-          display:flex;justify-content:flex-end;">
-          <button id="planning-modal-close2" class="btn-ghost" style="font-size:11px;">Cerrar</button>
-        </div>
-      </div>
-    </div>`;
-
-  document.getElementById('planning-modal-bg')?.remove();
-  document.body.insertAdjacentHTML('beforeend', html);
-
-  const close = () => document.getElementById('planning-modal-bg')?.remove();
-  document.getElementById('planning-modal-close')?.addEventListener('click', close);
-  document.getElementById('planning-modal-close2')?.addEventListener('click', close);
-  document.getElementById('planning-modal-bg')?.addEventListener('click', e => {
-    if (e.target.id === 'planning-modal-bg') close();
-  });
-}
-
-function _planningLegend() {
-  const items = [
-    ['ph1','Proyecto/Diseño'],
-    ['ph2','Obra'],
-    ['ph3','Montaje'],
-    ['ph4','Entrega'],
-    ['ph5','Renders'],
-    ['ph6','Visita'],
-    ['ph7','Pedidos'],
-    ['ph9','Parada/Espera'],
-  ];
-  return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
-    ${items.map(([cls,lbl]) =>
-      `<div style="display:flex;align-items:center;gap:5px;">
-         <div class="gantt-cell ${cls} filled" style="width:18px;height:14px;border-radius:2px;"></div>
-         <span style="font-size:10px;color:var(--ink3);">${lbl}</span>
-       </div>`
-    ).join('')}
-  </div>`;
-}
-
 /* ── Agrupación de personas por departamento ─────────────── */
-// Orden manual dentro de cada grupo (los primeros en la lista ocupan posición 0, 1, 2…)
 const ORDEN_MANUAL = {
-  'HOTELES':      ['Marta'],
-  'RESTAURANTES': ['Sofía'],
-  'VIVIENDA':     ['Olatz','Andrea','Sara','Nela','Cristina'],
+  'HOTELES':      ['Marta','Naiara'],
+  'RESTAURANTES': ['Sofía','Sofia'],
+  'VIVIENDA':     ['Olatz','Andrea','Sara','Nela','Cristina','Paula'],
   'SIN ASIGNAR':  []
 };
 
@@ -440,18 +407,16 @@ function getPersonasByGroup() {
     (MASTER_DATA||[]).forEach(p => {
       if (!(p.equipo||[]).includes(nombre)) return;
       const d = (p.dpto||'').toUpperCase();
-      if (d.includes('HOTEL'))        counts.HOTELES++;
-      else if (d.includes('RESTAURANTE')) counts.RESTAURANTES++;
-      else if (d.includes('VIVIENDA'))    counts.VIVIENDA++;
+      if (d.includes('HOTEL'))             counts.HOTELES++;
+      else if (d.includes('RESTAURANTE'))  counts.RESTAURANTES++;
+      else if (d.includes('VIVIENDA'))     counts.VIVIENDA++;
     });
     for (const dept of ['HOTELES','RESTAURANTES','VIVIENDA']) {
-      if (counts[dept] > 0 &&
-          counts[dept] === Math.max(...Object.values(counts))) return dept;
+      if (counts[dept] > 0 && counts[dept] === Math.max(...Object.values(counts))) return dept;
     }
-    // tie-break: HOTELES > RESTAURANTES > VIVIENDA
-    if (counts.HOTELES >= counts.RESTAURANTES && counts.HOTELES >= counts.VIVIENDA && counts.HOTELES > 0) return 'HOTELES';
-    if (counts.RESTAURANTES >= counts.VIVIENDA && counts.RESTAURANTES > 0) return 'RESTAURANTES';
-    if (counts.VIVIENDA > 0) return 'VIVIENDA';
+    if (counts.HOTELES > 0)      return 'HOTELES';
+    if (counts.RESTAURANTES > 0) return 'RESTAURANTES';
+    if (counts.VIVIENDA > 0)     return 'VIVIENDA';
     return 'SIN ASIGNAR';
   }
 
@@ -460,7 +425,6 @@ function getPersonasByGroup() {
   DEPTS.forEach(d => { groups[d] = []; });
   personas.forEach(n => { groups[primaryDept(n)].push(n); });
 
-  // Ordenar cada grupo: primero el orden manual, luego el resto alfabético
   DEPTS.forEach(dept => {
     const manual = (ORDEN_MANUAL[dept]||[]).filter(n => groups[dept].includes(n));
     const resto  = groups[dept].filter(n => !manual.includes(n)).sort();
@@ -479,7 +443,8 @@ const GROUP_STYLES = {
 };
 
 /* ── Tabs ─────────────────────────────────────────────────── */
-let curTab = 'javi';
+// Orden: ALEJANDRA primero, JAVIER segundo, luego grupos por dept
+let curTab = 'alejandra';
 
 function buildTabs() {
   const tabsEl = document.getElementById('tabs');
@@ -488,31 +453,32 @@ function buildTabs() {
 
   let html = '';
 
-  // Pestañas fijas
-  html += `<button class="tab tab-master${curTab==='javi'?' active':''}" data-tab="javi">JAVI</button>`;
-  html += `<button class="tab${curTab==='alejandra'?' active':''}" data-tab="alejandra">ALEJANDRA</button>`;
+  // Pestañas fijas: ALEJANDRA · DIRECCIÓN primero, JAVIER · CENTRO DE CONTROL segundo
+  html += `<button class="tab${curTab==='alejandra'?' active':''}" data-tab="alejandra"
+            style="font-weight:600;">ALEJANDRA · DIRECCIÓN</button>`;
+  html += `<button class="tab tab-master${curTab==='javi'?' active':''}" data-tab="javi"
+            style="font-weight:600;">JAVIER · CENTRO DE CONTROL</button>`;
 
-  // Separador visual
-  html += `<div style="width:1px;background:var(--line);margin:4px 2px;align-self:stretch;opacity:.4;"></div>`;
+  // Separador
+  html += `<div style="width:1px;background:var(--line);margin:4px 4px;align-self:stretch;opacity:.4;"></div>`;
 
-  // Grupos de personas
+  // Grupos por departamento (HOTELES, REST, VIV)
   order.forEach(dept => {
     const people = groups[dept];
     if (!people.length) return;
     const st = GROUP_STYLES[dept] || {};
 
-    // Banda de fondo para el grupo — color más diferenciable
     html += `<div class="tab-group" style="
       display:flex;align-items:center;gap:2px;
-      background:color-mix(in srgb,${st.bg} 22%,transparent);
+      background:color-mix(in srgb,${st.bg} 18%,transparent);
       border-radius:6px;padding:2px 6px;
-      border:1px solid color-mix(in srgb,${st.bg} 35%,transparent);">`;
+      border:1px solid color-mix(in srgb,${st.bg} 30%,transparent);">`;
 
     people.forEach(nombre => {
-      const slug = nombre.toLowerCase().replace(/\s+/g,'_');
+      const slug = nombre.toLowerCase().replace(/\s+/g,'_').replace(/[áa]/g,'a').replace(/[éeê]/g,'e');
       const id   = `p__${slug}`;
       html += `<button class="tab${curTab===id?' active':''}" data-tab="${id}"
-                       style="white-space:nowrap;">${nombre}</button>`;
+               style="white-space:nowrap;font-size:11px;">${nombre}</button>`;
     });
     html += `</div>`;
   });
@@ -525,55 +491,44 @@ function activateTab(id) {
   document.querySelectorAll('#tabs .tab').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === id));
 
-  if      (id === 'javi')      renderJavi();
-  else if (id === 'alejandra') renderAlejandra();
+  if      (id === 'alejandra') renderAlejandra();
+  else if (id === 'javi')      renderJavi();
   else if (id.startsWith('p__')) {
     const slug   = id.slice(3);
-    const nombre = getPersonas().find(n => n.toLowerCase().replace(/\s+/g,'_') === slug);
+    // Buscar la persona cuyo slug coincida
+    const nombre = getPersonas().find(n => {
+      const ns = n.toLowerCase().replace(/\s+/g,'_').replace(/[áa]/g,'a').replace(/[éeê]/g,'e');
+      return ns === slug;
+    });
     if (nombre) renderPersona(nombre);
   }
 }
 
-/* ── Render Javi — CENTRO DE CONTROL ──────────────────────── */
-function renderJavi() {
-  const todos = (MASTER_DATA||[]).map(enrich);
-  const sem   = hoySemana();
+/* ── COLORES DE BLOQUES para índices ────────────────────────
+   Deben coincidir con los fondos de los paneles.
+   ──────────────────────────────────────────────────────────*/
+const BG_ALERTA    = 'rgba(180,30,30,.08)';
+const BG_ATENCION  = 'rgba(196,122,42,.07)';
+const BG_INFO      = 'rgba(80,80,140,.05)';
+const BG_CONTROLADO= 'rgba(0,0,0,.03)';
+const BG_SEMANA    = 'rgba(42,100,140,.06)';
+const BG_PROX      = 'rgba(42,120,80,.05)';
+const BG_OTROS     = 'rgba(0,0,0,.02)';
 
-  const GRUPOS = [
-    { level:0, label:'● ALERTA',        cls:'tag-crit', withGantt:true  },
-    { level:1, label:'● ATENCIÓN',      cls:'tag-alto', withGantt:true  },
-    { level:2, label:'● INFO FALTANTE', cls:'tag-med',  withGantt:false },
-    { level:3, label:'● CONTROLADO',    cls:'tag-baj',  withGantt:false },
-  ];
+const BORDE_ALERTA    = '#b41e1e';
+const BORDE_ATENCION  = '#c47a2a';
+const BORDE_INFO      = '#50508c';
+const BORDE_CONTROLADO= '#aaaaaa';
+const BORDE_SEMANA    = '#2a648c';
+const BORDE_PROX      = '#2a7850';
+const BORDE_OTROS     = '#cccccc';
 
-  GRUPOS.forEach(g => { g.projs = todos.filter(p => atLevel(p) === g.level); });
-
-  let html = `<div class="view-head">
-    <div>
-      <div class="view-title">CENTRO DE CONTROL</div>
-      <div class="view-sub">${sem} · ${todos.length} proyectos</div>
-    </div>
-  </div>`;
-
-  const BG_JAVI = {
-    0: 'rgba(180,30,30,.05)',   // ALERTA — rojo muy suave
-    1: 'rgba(196,122,42,.05)',  // ATENCIÓN — ámbar muy suave
-    2: 'rgba(80,80,140,.04)',   // INFO FALTANTE — azul muy suave
-    3: 'rgba(0,0,0,.02)',       // CONTROLADO — neutro
-  };
-
-  GRUPOS.forEach(g => {
-    if (!g.projs.length) return;
-    const panelCls = g.level===0?'panel-alerta':g.level===1?'panel-atencion':'';
-    html += `<div class="panel ${panelCls}" style="background:${BG_JAVI[g.level]};">
-      <div class="panel-head">
-        <span class="eyebrow">${tagHtml(g.cls, g.label)}&ensp;<span style="font-weight:300;color:var(--ink3);">${g.projs.length}</span></span>
-      </div>
-      ${g.projs.map(p => projCard(p, {gantt: g.withGantt})).join('')}
-    </div>`;
-  });
-
-  document.getElementById('view').innerHTML = html;
+function indexBtn(id, label, bg, borde, count) {
+  if (!count) return '';
+  return `<a href="#${id}" class="idx-btn"
+    style="background:${bg};border:1px solid ${borde};color:${borde};">
+    ${label} <span style="font-weight:300;opacity:.7;">${count}</span>
+  </a>`;
 }
 
 /* ── Render Alejandra — DIRECCIÓN ─────────────────────────── */
@@ -584,69 +539,51 @@ function renderAlejandra() {
   const alerta   = todos.filter(p => atLevel(p) === 0);
   const atencion = todos.filter(p => atLevel(p) === 1);
 
-  // ESTA SEMANA: solo proyectos en ALERTA/ATENCIÓN con actividad esta semana
-  // + proyectos que no están en ALERTA/ATENCIÓN pero sí tienen actividad esta semana
-  // Máximo 8 para mantener la portada limpia
-  const estaSemanaAlert = todos.filter(p => atLevel(p) <= 1 && projHasActivityThisWeek(p));
-  const estaSemanaNormal = todos.filter(p => atLevel(p) > 1 && projHasActivityThisWeek(p));
-  // Mostramos solo los que tienen hito próximo entre los normales (máx 6)
-  const estaSemanaShow = [
-    ...estaSemanaAlert,
-    ...estaSemanaNormal
-      .filter(p => p._g?.fecha_hito)
-      .sort((a,b) => (a._g.fecha_hito < b._g.fecha_hito ? -1 : 1))
-      .slice(0, 6)
-  ];
-
-  // PRÓXIMAMENTE: solo hitos en las próximas 3 semanas
-  const allSems  = PLANNING_DATA?.semanas || [];
-  const hoyIdx   = allSems.indexOf(sem);
-  const proxSems = hoyIdx >= 0 ? allSems.slice(hoyIdx + 1, hoyIdx + 4) : [];
+  const estaSemanaAlert  = todos.filter(p => atLevel(p) <= 1 && projHasActivityThisWeek(p));
+  const estaSemanaNormal = todos.filter(p => atLevel(p) > 1  && projHasActivityThisWeek(p));
+  const estaSemana = [...estaSemanaAlert, ...estaSemanaNormal];
 
   const proximamente = todos
-    .filter(p => {
-      if (!p._g?.fecha_hito) return false;
-      // Fecha de hito debe estar dentro de las próximas ~3 semanas (aprox. 21 días)
-      const fh = p._g.fecha_hito; // formato "DD/MM/YYYY" o ISO
-      return true; // se filtra por actividad en planning, más fiable
-    })
     .filter(p => projHasActivityInWindow(p, 1, 3))
     .sort((a,b) => {
       const da = a._g?.fecha_hito||'', db = b._g?.fecha_hito||'';
       return da < db ? -1 : da > db ? 1 : 0;
     });
 
+  // Índice
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${indexBtn('ale-alerta',    '● ALERTA',      BG_ALERTA,    BORDE_ALERTA,    alerta.length)}
+      ${indexBtn('ale-atencion',  '● ATENCIÓN',    BG_ATENCION,  BORDE_ATENCION,  atencion.length)}
+      ${indexBtn('ale-semana',    'ESTA SEMANA',   BG_SEMANA,    BORDE_SEMANA,    estaSemana.length)}
+      ${indexBtn('ale-prox',      'PRÓXIMAMENTE',  BG_PROX,      BORDE_PROX,      proximamente.length)}
+    </div>`;
+
   let html = `<div class="view-head">
     <div>
       <div class="view-title">DIRECCIÓN</div>
-      <div class="view-sub">${sem}</div>
+      <div class="view-sub">${sem} · ${todos.length} proyectos</div>
     </div>
+  </div>
+  ${indiceHtml}`;
+
+  html += `<div id="ale-alerta" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
+    <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}&ensp;<span style="font-weight:300;color:var(--ink3);">${alerta.length}</span></div>
+    ${alerta.length ? alerta.map(p => projCard(p,{gantt:false})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
   </div>`;
 
-  // ALERTA
-  html += `<div class="panel panel-alerta" style="background:rgba(180,30,30,.05);">
-    <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}</div>
-    ${alerta.length
-      ? alerta.map(p => projCard(p,{gantt:false})).join('')
-      : '<p class="panel-note">Sin proyectos en alerta.</p>'}
+  html += `<div id="ale-atencion" class="panel" style="background:${BG_ATENCION};border-left:3px solid ${BORDE_ATENCION};">
+    <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}&ensp;<span style="font-weight:300;color:var(--ink3);">${atencion.length}</span></div>
+    ${atencion.length ? atencion.map(p => projCard(p,{gantt:false})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
   </div>`;
 
-  // ATENCIÓN
-  html += `<div class="panel panel-atencion" style="background:rgba(196,122,42,.05);">
-    <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}</div>
-    ${atencion.length
-      ? atencion.map(p => projCard(p,{gantt:false})).join('')
-      : '<p class="panel-note">Sin alertas de atención.</p>'}
-  </div>`;
-
-  // ESTA SEMANA (tabla)
-  if (estaSemanaShow.length) {
-    html += `<div class="panel">
-      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span></div>
+  if (estaSemana.length) {
+    html += `<div id="ale-semana" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span> <span style="font-size:11px;color:var(--ink3);font-weight:300;">${sem}</span></div>
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Proyecto</th><th>Dpto</th><th>Actividad</th><th>Próximo hito</th><th>Fecha</th></tr></thead>
         <tbody>
-          ${estaSemanaShow.map(p => {
+          ${estaSemana.map(p => {
             const entry = (p._p?.timeline||[]).find(t => t.semana === sem);
             const act   = (entry?.actividades||[]).map(a=>a.texto).join(', ') || '—';
             return `<tr style="cursor:pointer;" data-open="${p.id}">
@@ -662,9 +599,8 @@ function renderAlejandra() {
     </div>`;
   }
 
-  // PRÓXIMAMENTE (solo 3 semanas vista)
   if (proximamente.length) {
-    html += `<div class="panel">
+    html += `<div id="ale-prox" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
       <div class="panel-head"><span class="eyebrow">PRÓXIMAMENTE</span></div>
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
@@ -683,35 +619,63 @@ function renderAlejandra() {
   document.getElementById('view').innerHTML = html;
 }
 
+/* ── Render Javi — CENTRO DE CONTROL ──────────────────────── */
+function renderJavi() {
+  const todos = (MASTER_DATA||[]).map(enrich);
+  const sem   = hoySemana();
+
+  const GRUPOS = [
+    { level:0, id:'javi-alerta',     label:'● ALERTA',        cls:'tag-crit', bg:BG_ALERTA,     borde:BORDE_ALERTA,    withGantt:true  },
+    { level:1, id:'javi-atencion',   label:'● ATENCIÓN',      cls:'tag-alto', bg:BG_ATENCION,   borde:BORDE_ATENCION,  withGantt:true  },
+    { level:2, id:'javi-info',       label:'● INFO FALTANTE', cls:'tag-med',  bg:BG_INFO,       borde:BORDE_INFO,      withGantt:false },
+    { level:3, id:'javi-controlado', label:'● CONTROLADO',    cls:'tag-baj',  bg:BG_CONTROLADO, borde:BORDE_CONTROLADO,withGantt:false },
+  ];
+
+  GRUPOS.forEach(g => { g.projs = todos.filter(p => atLevel(p) === g.level); });
+
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${GRUPOS.map(g => indexBtn(g.id, g.label, g.bg, g.borde, g.projs.length)).join('')}
+    </div>`;
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">CENTRO DE CONTROL</div>
+      <div class="view-sub">${sem} · ${todos.length} proyectos</div>
+    </div>
+  </div>
+  ${indiceHtml}`;
+
+  GRUPOS.forEach(g => {
+    if (!g.projs.length) return;
+    html += `<div id="${g.id}" class="panel" style="background:${g.bg};border-left:3px solid ${g.borde};">
+      <div class="panel-head">
+        <span class="eyebrow">${tagHtml(g.cls, g.label)}&ensp;<span style="font-weight:300;color:var(--ink3);">${g.projs.length}</span></span>
+      </div>
+      ${g.projs.map(p => projCard(p, {gantt: g.withGantt})).join('')}
+    </div>`;
+  });
+
+  document.getElementById('view').innerHTML = html;
+}
+
 /* ── Render Persona ──────────────────────────────────────── */
 function renderPersona(nombre) {
   const todos = (MASTER_DATA||[]).filter(p => (p.equipo||[]).includes(nombre)).map(enrich);
   const sem   = hoySemana();
 
-  // 1. PRIORIDAD: atLevel ≤ 1, ordenados por nivel
-  const prioridad = todos.filter(p => atLevel(p) <= 1).sort((a,b) => atLevel(a) - atLevel(b));
-  const prioIds   = new Set(prioridad.map(p => p.id));
-
-  // 2. ESTA SEMANA: actividad esta semana, no en PRIORIDAD
-  const estaSemana = todos.filter(p => !prioIds.has(p.id) && projHasActivityThisWeek(p));
-  const estaIds    = new Set(estaSemana.map(p => p.id));
-
-  // 3. OTROS PROYECTOS: el resto (incluye próximas semanas, sin actividad, etc.)
+  const prioridad      = todos.filter(p => atLevel(p) <= 1).sort((a,b) => atLevel(a)-atLevel(b));
+  const prioIds        = new Set(prioridad.map(p => p.id));
+  const estaSemana     = todos.filter(p => !prioIds.has(p.id) && projHasActivityThisWeek(p));
+  const estaIds        = new Set(estaSemana.map(p => p.id));
   const otrosProyectos = todos.filter(p => !prioIds.has(p.id) && !estaIds.has(p.id));
 
-  // Índice rápido de anclaje
-  const anchors = [
-    prioridad.length     ? 'PRIORIDAD'      : null,
-    estaSemana.length    ? 'ESTA SEMANA'    : null,
-    otrosProyectos.length? 'OTROS PROYECTOS': null,
-  ].filter(Boolean);
-
-  const indiceHtml = anchors.length > 1
-    ? `<div style="font-size:10.5px;letter-spacing:.08em;color:var(--ink3);margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap;">
-        ${anchors.map(a => `<a href="#sec-${a.replace(/ /g,'-')}"
-          style="color:var(--cop);text-decoration:none;font-weight:600;">${a}</a>`).join(' · ')}
-      </div>`
-    : '';
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${indexBtn('sec-PRIORIDAD',       '● PRIORIDAD',       BG_ALERTA,   BORDE_ALERTA,   prioridad.length)}
+      ${indexBtn('sec-ESTA-SEMANA',     'ESTA SEMANA',       BG_SEMANA,   BORDE_SEMANA,   estaSemana.length)}
+      ${indexBtn('sec-OTROS-PROYECTOS', 'OTROS PROYECTOS',   BG_OTROS,    BORDE_OTROS,    otrosProyectos.length)}
+    </div>`;
 
   let html = `<div class="view-head">
     <div>
@@ -722,21 +686,21 @@ function renderPersona(nombre) {
   ${indiceHtml}`;
 
   if (prioridad.length) {
-    html += `<div id="sec-PRIORIDAD" class="panel panel-alerta">
-      <div class="panel-head">${tagHtml('tag-crit','● PRIORIDAD')}&ensp;<span class="eyebrow" style="font-weight:300;">${prioridad.length}</span></div>
+    html += `<div id="sec-PRIORIDAD" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
+      <div class="panel-head">${tagHtml('tag-crit','● PRIORIDAD')}&ensp;<span style="font-weight:300;color:var(--ink3);">${prioridad.length}</span></div>
       ${prioridad.map(p => projCard(p, {gantt:false})).join('')}
     </div>`;
   }
 
   if (estaSemana.length) {
-    html += `<div id="sec-ESTA-SEMANA" class="panel panel-semana">
+    html += `<div id="sec-ESTA-SEMANA" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
       <div class="panel-head"><span class="eyebrow">ESTA SEMANA · ${sem}</span></div>
       ${estaSemana.map(p => projCard(p, {gantt:true})).join('')}
     </div>`;
   }
 
   if (otrosProyectos.length) {
-    html += `<div id="sec-OTROS-PROYECTOS" class="panel panel-otros">
+    html += `<div id="sec-OTROS-PROYECTOS" class="panel" style="background:${BG_OTROS};border-left:3px solid ${BORDE_OTROS};">
       <div class="panel-head"><span class="eyebrow">OTROS PROYECTOS · ${otrosProyectos.length}</span></div>
       ${otrosProyectos.map(p => projCard(p, {gantt:false})).join('')}
     </div>`;
@@ -771,25 +735,54 @@ function exportar() {
   const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = `pombo_${sem.replace('/','_')}.txt`;
+  a.download = `pombo_${(sem||'export').replace('/','_')}.txt`;
   a.click();
 }
 
-/* ── CSS dinámico para estilos de panel y tabs ────────────── */
+/* ── CSS dinámico ─────────────────────────────────────────── */
 function injectStyles() {
   const css = `
-    .panel-alerta  { border-left: 3px solid var(--crit); }
-    .panel-atencion{ border-left: 3px solid var(--alto,#c47a2a); }
-    .panel-semana  { border-left: 3px solid var(--cop); }
-    .panel-otros   { border-left: 3px solid var(--line); }
-    .tab-group     { display:inline-flex; }
-    .modal-section { margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+    /* Botón VER con fondo corporativo */
+    .btn-ver {
+      font-size:10.5px;font-weight:600;letter-spacing:.07em;
+      padding:5px 12px;white-space:nowrap;flex-shrink:0;
+      background:var(--burg,#4a2020);color:#fff;
+      border:none;border-radius:4px;cursor:pointer;
+      transition:opacity .15s;
+    }
+    .btn-ver:hover { opacity:.82; }
+
+    /* Índice de navegación */
+    .idx-nav {
+      display:flex;flex-wrap:wrap;gap:8px;
+    }
+    .idx-btn {
+      font-size:10.5px;font-weight:600;letter-spacing:.07em;
+      padding:5px 13px;border-radius:4px;text-decoration:none;
+      transition:opacity .15s;
+    }
+    .idx-btn:hover { opacity:.75; }
+
+    /* Paneles */
+    .panel { margin-bottom:16px;border-radius:6px;padding:14px 16px; }
+    .panel-note { font-size:12px;color:var(--ink3);padding:8px 0; }
+
+    /* Modal */
+    .modal-section { margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line); }
     .modal-section:last-child { border-bottom:none; }
     .modal-section-label {
       font-size:9.5px;font-weight:700;letter-spacing:.1em;
       text-transform:uppercase;color:var(--ink3);margin-bottom:8px;
     }
-    .panel-note { font-size:12px;color:var(--ink3);padding:8px 0; }
+
+    /* Tab groups */
+    .tab-group { display:inline-flex; }
+
+    /* Scroll en modal en pantallas pequeñas */
+    @media (max-width:780px) {
+      .modal > .modal-body { grid-template-columns:1fr !important; }
+      .modal > .modal-body > div:nth-child(2) { border-left:none !important; padding-left:0 !important; border-top:1px solid var(--line); padding-top:16px; }
+    }
   `;
   const el = document.createElement('style');
   el.textContent = css;
@@ -818,13 +811,13 @@ function init() {
   buildIndexes();
   buildTabs();
   wireEvents();
-  activateTab('javi');
+  activateTab('alejandra');  // Alejandra es la pestaña inicial
 
   const wb = document.getElementById('week-badge');
   if (wb) wb.textContent = hoySemana();
 
   const ub = document.getElementById('update-badge');
-  if (ub && META?.updated) ub.textContent = 'Act. ' + META.updated.replace('T',' ').slice(0,16);
+  if (ub && META?.updated) ub.textContent = 'Act. ' + META.updated;
 }
 
 document.addEventListener('DOMContentLoaded', init);

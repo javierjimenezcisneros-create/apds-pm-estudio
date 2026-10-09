@@ -590,13 +590,11 @@ for pid, pr in _planning_raw.items():
     tl = fases_to_timeline(pr['fases'], WEEK_LABELS)
     if tl:
         planning_proyectos.append({'id': pid, 'timeline': tl})
-# Completar con los del MASTER que no estén ya (tl es {nombre_semana: label})
+# Completar con los del MASTER que no estén ya (tl es {week_idx: label} con índices numéricos)
 ids_en_planning = {pr['id'] for pr in planning_proyectos}
 for p in MASTER:
     if p['id'] not in ids_en_planning and p.get('tl'):
-        # tl del MASTER viene del extract_planning, que ya usa nombre de semana como clave
-        tl = [{'semana': sem, 'actividades': [{'texto': str(lbl)}]}
-              for sem, lbl in p['tl'].items() if sem and lbl]
+        tl = fases_to_timeline(p['tl'], WEEK_LABELS)
         if tl:
             planning_proyectos.append({'id': p['id'], 'timeline': tl})
 
@@ -620,16 +618,16 @@ if _week_labels_p:
         pasadas = [(f, i) for f, i in fechas if f <= hoy_date]
         TODAY_WEEK = pasadas[-1][1] if pasadas else 0
 
-PLANNING_DATA = {
-    'semanas':   WEEK_LABELS,
-    'meses':     MONTHS,
-    'hoy':       TODAY_WEEK,
-    'proyectos': planning_proyectos,
-}
-
 # hoy_semana debe ser el LABEL de la semana actual (string), no el índice numérico.
 # app.js hace sems.indexOf(hoySemana()) — necesita el mismo string que está en WEEK_LABELS.
 HOY_SEMANA_LABEL = WEEK_LABELS[TODAY_WEEK] if 0 <= TODAY_WEEK < len(WEEK_LABELS) else ''
+
+PLANNING_DATA = {
+    'semanas':   WEEK_LABELS,
+    'meses':     MONTHS,
+    'hoy':       HOY_SEMANA_LABEL,
+    'proyectos': planning_proyectos,
+}
 
 META = {
     'updated':    hoy.strftime('%d %b %Y'),
