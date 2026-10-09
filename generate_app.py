@@ -386,8 +386,10 @@ if os.path.exists(GLOBAL_EXCEL):
         gid = make_id(n)
         _global_raw[gid] = {
             'id':                  gid,
+            'nombre_original':     n,
             'fase_real':           str(row[2]  or '—').strip(),
             'actividad_actual':    str(row[3]  or '—').strip(),
+            'atencion':            str(row[1]  or '').strip(),
             'fecha_hito':          str(row[4]  or '—').strip(),
             'fin_obra':            str(row[5]  or '—').strip(),
             'montaje':             str(row[6]  or '—').strip(),
@@ -461,9 +463,65 @@ if os.path.exists(PLANNING_EXCEL):
 else:
     print("⚠ PLANNING_POMBO.xlsx no encontrado — usando PLANNING del master")
 
+# ── FUSIONAR LAS TRES FUENTES ──────────────────────────────────────────────────
+# Base: proyectos del MASTER (identidad + estado)
+# Completar con proyectos del GLOBAL que no estén en el MASTER
+# Completar con proyectos del PLANNING que no estén en ninguno de los dos
+
+_master_index = {p['id']: p for p in MASTER}
+
+# Proyectos en GLOBAL pero no en MASTER → añadir stub desde GLOBAL
+for gid, g in _global_raw.items():
+    if gid not in _master_index:
+        # Derivar nombre legible desde la clave del global (el gid ya es limpio)
+        # Buscar el nombre original en _global_raw (necesitamos el nombre original)
+        # Lo recuperamos directamente del raw ya que g no tiene 'nombre' aún
+        # Re-leer del Excel no es viable aquí — usamos el id como proxy
+        _master_index[gid] = {
+            'id': gid,
+            'nombre': g.get('nombre_original', gid.replace('_',' ').upper()),
+            'dept':   '',
+            'resp':   '',
+            'estado': '',
+            'hito':   g.get('actividad_actual', '—'),
+            'fecha':  g.get('fecha_hito', '—'),
+            'bloqueador': g.get('bloqueador', ''),
+            'constructora': '—',
+            'fase':   g.get('fase_real', '—'),
+            'atencion': '',
+            'nivel':  '',
+            'obs':    g.get('accion_concreta', ''),
+            'tl': {},
+        }
+
+# Proyectos en PLANNING pero no en ninguno de los dos
+for pid, pr in _planning_raw.items():
+    if pid not in _master_index:
+        _master_index[pid] = {
+            'id':    pid,
+            'nombre': pid.replace('_',' ').upper(),
+            'dept':   pr.get('dpto', ''),
+            'resp':   pr.get('resp', ''),
+            'estado': '',
+            'hito':   pr.get('hito', '—'),
+            'fecha':  '—',
+            'bloqueador': '',
+            'constructora': '—',
+            'fase':   pr.get('fase', '—'),
+            'atencion': '',
+            'nivel':  '',
+            'obs':    '',
+            'tl': {},
+        }
+
+# Lista unificada (MASTER primero para mantener orden original)
+_all_projects = list(MASTER) + [
+    p for pid, p in _master_index.items() if pid not in {m['id'] for m in MASTER}
+]
+
 # ── MASTER_DATA ────────────────────────────────────────────────────────────────
 MASTER_DATA = []
-for p in MASTER:
+for p in _all_projects:
     pid = p['id']
     g   = _global_raw.get(pid, {})
     MASTER_DATA.append({
@@ -493,13 +551,13 @@ for p in MASTER:
 
 # ── GLOBAL_DATA (campos que app.js accede vía _g = globalOf(id)) ──────────────
 GLOBAL_DATA = []
-for p in MASTER:
+for p in _all_projects:
     pid = p['id']
     g   = _global_raw.get(pid, {})
     GLOBAL_DATA.append({
         'id':              pid,
-        'atencion':        p['atencion'],        # nivel de atención (del MASTER)
-        'proximo_hito':    g.get('actividad_actual', p['hito']),  # lo que app busca
+        'atencion':        p['atencion'],
+        'proximo_hito':    g.get('actividad_actual', p['hito']),
         'fecha_hito':      g.get('fecha_hito', p['fecha']),
         'bloqueador':      g.get('bloqueador', p['bloqueador']),
         'obs':             g.get('accion_concreta', p['obs']),
