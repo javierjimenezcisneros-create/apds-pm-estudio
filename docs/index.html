@@ -118,6 +118,10 @@ html,body{background:var(--paper);color:var(--ink);font-family:var(--f);font-siz
 .ph1{background:var(--ph1);} .ph2{background:var(--ph2);} .ph3{background:var(--ph3);}
 .ph4{background:var(--ph4);} .ph5{background:var(--ph5);} .ph6{background:var(--ph6);}
 .ph7{background:var(--ph7);} .ph8{background:var(--ph8);} .ph9{background:var(--ph9);}
+/* pendiente de planificación: rango activo sin actividad registrada NI fase inferible */
+.ph-pending{background:repeating-linear-gradient(135deg,var(--paper2) 0px,var(--paper2) 4px,rgba(180,170,160,.25) 4px,rgba(180,170,160,.25) 8px);border:1px dashed rgba(150,140,130,.4);}
+/* continuidad de fase: semana sin registro explícito, rellena con la última fase conocida */
+.ph-continuidad{opacity:.72;}
 
 /* ── PROJECT CARDS ── */
 .proj-card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:14px 16px;margin-bottom:10px;}
@@ -165,10 +169,21 @@ details.collapse .inner{padding:0 14px 14px;}
 .btn-ghost:hover{border-color:var(--cop);color:var(--cop);}
 .btn-danger{font-family:var(--f);font-size:11px;padding:7px 14px;border-radius:2px;cursor:pointer;border:1px solid var(--crit-t);background:transparent;color:var(--crit);}
 
-/* ── MODAL ── */
-.modal-bg{position:fixed;inset:0;background:rgba(26,20,16,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);}
-.modal{background:var(--surface);border-radius:4px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(26,20,16,.22);overflow:hidden;}
-.modal-head{background:var(--burg);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;}
+/* ── MODAL BASE (genérico, pequeño) ── */
+.modal-bg{position:fixed;inset:0;background:rgba(26,20,16,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px);}
+.modal{background:var(--surface);border-radius:4px;width:min(96vw,480px);max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(26,20,16,.22);}
+/* modal-ficha: VER PROYECTO — ocupa 88% ancho × 88% alto */
+.modal-ficha{
+  width:88vw !important;
+  max-width:88vw !important;
+  min-width:min(88vw,640px) !important;
+  min-height:82vh;
+  max-height:88vh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.modal-head{background:var(--burg);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .modal-title{font-size:10.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);}
 .modal-sub{font-size:10px;font-weight:300;letter-spacing:.06em;color:rgba(194,105,66,.6);margin-top:2px;}
 .modal-close{background:none;border:none;color:rgba(194,105,66,.6);font-size:20px;cursor:pointer;padding:0 2px;line-height:1;}
@@ -176,7 +191,7 @@ details.collapse .inner{padding:0 14px 14px;}
 .modal-body{padding:18px;}
 .modal-body textarea{width:100%;min-height:90px;resize:vertical;font-family:var(--f);font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;line-height:1.5;}
 .modal-body textarea:focus{outline:none;border-color:var(--cop);}
-.modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;align-items:center;}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;align-items:center;flex-shrink:0;}
 .modal-foot .left{margin-right:auto;}
 
 /* ── SEMANAS CRÍTICAS ── */
@@ -230,557 +245,1050 @@ details.collapse .inner{padding:0 14px 14px;}
 </footer>
 <script>
 
-const WEEK_LABELS = ["17-19J", "22-26J", "29J-3Jl", "6-10Jl", "13-17Jl", "20-24Jl", "27-31Jl", "3-7A", "10-14A", "17-21A", "24-28A", "31A-4S", "7-11S", "14-18S", "21-25S", "28-2O"];
-const MONTHS = [["JUN", 0, 0], ["JUL", 1, 5], ["AGO", 6, 9], ["SEP", 10, 13], ["OCT", 14, 15]];
-const TODAY_WEEK = 0;
-const WEEK_LABEL = "Semana 22 Jun 2026";
-const WEEK_STAMP = "SEM 22·06·2026";
-const UPDATED = "Actualizado 22 Jun 2026";
-const MASTER = [{"nombre": "MONTESQUINZA", "dept": "VIVIENDA", "resp": "Sara/Andrea/Nela", "estado": "Entregando a Constructora", "hito": "Entrega proyecto Consultores esta sem", "fecha": "Esta semana", "bloqueador": "—", "constructora": "Consultores Proy.", "fase": "OBRA", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"0": "ENTREGA", "9": "PROY DECO"}}, {"nombre": "PEDRAZA", "dept": "VIVIENDA", "resp": "Olatz+Paula+becaria", "estado": "Prep. montaje", "hito": "Visita jue 18 + Montaje 6-14jul + 15-24jul", "fecha": "Jue 18 jun", "bloqueador": "Falta atrezzo · Color suelo · Conflicto Olatz/Paula", "constructora": "Amarco", "fase": "MONTAJE", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"1": "PEDIDOS", "2": "MONTAJE"}}, {"nombre": "JOANN", "dept": "RESTAURANTES", "resp": "Sofía", "estado": "Renders semanales", "hito": "Render Salón/Estudio sem 22 jun", "fecha": "22 jun", "bloqueador": "Compromiso Alejandra con clienta", "constructora": "—", "fase": "PROYECTO", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"0": "R1", "1": "R2", "2": "R3", "3": "R1", "4": "R2", "5": "R3", "6": "R1", "7": "FUERA", "11": "PROY E"}}, {"nombre": "ALTHEON", "dept": "RESTAURANTES", "resp": "Laia", "estado": "Anteproyecto", "hito": "Presentación Barcelona lun 22 jun", "fecha": "Lun 22 jun", "bloqueador": "⚠ Presentación sin terminar esta semana", "constructora": "—", "fase": "ANTEPROYECTO", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"0": "PROY B", "1": "REUNIÓN", "2": "PROY B", "7": "FUERA"}}, {"nombre": "LAGOS 132", "dept": "RESTAURANTES", "resp": "Sofía+equipo REST", "estado": "Obra en ejecución", "hito": "Reunión clientes jue 25 jun (pdte)", "fecha": "25 jun", "bloqueador": "Instalaciones sin cerrar", "constructora": "Ferbocar", "fase": "OBRA", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"0": "REUNIÓN"}}, {"nombre": "ZAHARA", "dept": "VIVIENDA", "resp": "Paula+Alejandra", "estado": "Obra en ejecución", "hito": "Montaje 13-15jul · Riesgo Raúl", "fecha": "13 jul", "bloqueador": "Raúl puede no terminar a tiempo", "constructora": "Raúl", "fase": "OBRA", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"4": "MONTAJE", "5": "ALEJANDRA"}}, {"nombre": "GAMAL RD", "dept": "RESTAURANTES", "resp": "Sofía+Olatz+Ale", "estado": "Mobiliario en camino", "hito": "Montaje 13-26 jul (viaje RD)", "fecha": "13 jul", "bloqueador": "⚠ Olatz: Pedraza→Gamal sin pausa", "constructora": "—", "fase": "MONTAJE", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"0": "PEDIDOS", "4": "MONTAJE"}}, {"nombre": "BERNABÉU", "dept": "RESTAURANTES", "resp": "Laia+Naiara", "estado": "Pedidos casi completos", "hito": "Fecha montaje + 3ª persona ppios jul", "fecha": "Ppios jul", "bloqueador": "⚠ Alfombra crítica · 3ª persona sin resolver", "constructora": "Consultores Proy.", "fase": "PEDIDOS", "atencion": "MÁXIMA", "nivel": "ATENCIÓN MÁXIMA", "tl": {"0": "PEDIDOS", "4": "FUERA", "5": "PEDIDOS", "7": "⚠", "8": "MONTAJE", "9": "ALEJANDRA"}}, {"nombre": "PUERTO RICO", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "estado": "Presupuesto pdte", "hito": "Cerrar aceptación + visitas Amboage", "fecha": "Jun", "bloqueador": "⚠ Riesgo Amboage (FOX+volumen aquí)", "constructora": "Amboage (Gustavo)", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "PROY DECO", "1": "PEDIDOS"}}, {"nombre": "RUBAIYAT", "dept": "RESTAURANTES", "resp": "Naiara", "estado": "Montaje en curso", "hito": "Montaje 3-4 semanas (local abierto)", "fecha": "Jun/Jul", "bloqueador": "Local abierto — por fases", "constructora": "—", "fase": "MONTAJE", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "MONTAJE"}}, {"nombre": "FOX", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "estado": "Cerrando remates", "hito": "Coordinar cierre carpintería", "fecha": "Jun/Jul", "bloqueador": "Carpintería retrasada y deficiente", "constructora": "—", "fase": "ENTREGA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "ENTREGA"}}, {"nombre": "VIUDA ALDAMA", "dept": "VIVIENDA", "resp": "Cristina (resp.) + Sara (apoyo)", "estado": "⚠ Cliente preocupada · Cristina asume como responsable", "hito": "Traspaso Sara→Cristina esta sem · fotomontajes · sem22: renders · avanzar sótano", "fecha": "Esta semana", "bloqueador": "Natalia va a escribir a Alejandra · Raúl valorando sin noticias · traspaso ordenado urgente", "constructora": "—", "fase": "OBRA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"11": "ENTREGA", "12": "ALEJANDRA"}}, {"nombre": "HERMOSILLA", "dept": "VIVIENDA", "resp": "Nela(resp.)/Olatz", "estado": "Cliente respondió hoy", "hito": "Presionar Raumplan para presupuesto", "fecha": "Esta semana", "bloqueador": "Raumplan sin presupuesto", "constructora": "Raumplan", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "⚠", "10": "PROY DECO"}}, {"nombre": "ABUBILLA", "dept": "VIVIENDA", "resp": "Andrea", "estado": "Remates/extras (3 meses)", "hito": "Poner límite al cliente", "fecha": "Esta semana", "bloqueador": "3 meses desde '2 semanas para revisar'", "constructora": "—", "fase": "ENTREGA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "⚠"}}, {"nombre": "HIPÓDROMO", "dept": "RESTAURANTES", "resp": "Laia+Naiara", "estado": "Proyecto", "hito": "Visita jue 18 jun + glosario completo", "fecha": "Jue 18 jun", "bloqueador": "Falta atrezzo y accesorios baños", "constructora": "4 construct.", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "REUNIÓN", "1": "PROY DECO", "11": "PROY DECO"}}, {"nombre": "TORRE VALENCIA", "dept": "VIVIENDA", "resp": "Paula", "estado": "Proyecto", "hito": "Reunión Emir jue 18 jun — baños", "fecha": "Jue 18 jun", "bloqueador": "Ecobuild sin planning cerrado", "constructora": "Ecobuild", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"5": "MONTAJE", "6": "ALEJANDRA"}}, {"nombre": "VINCCI VALENCIA", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Proyecto", "hito": "Deadline ZZCC vie 19 jun", "fecha": "Vie 19 jun", "bloqueador": "—", "constructora": "—", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"5": "MONTAJE", "6": "ALEJANDRA"}}, {"nombre": "LAGOS 105", "dept": "VIVIENDA", "resp": "Andrea", "estado": "Revisando proyecto", "hito": "Reunión cliente+Pedro lun 22 jun", "fecha": "Lun 22 jun", "bloqueador": "Glosario deco pendiente", "constructora": "Raúl/Jamena", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "REUNIÓN", "1": "R1"}}, {"nombre": "PSN OFICINAS", "dept": "HOTELES", "resp": "Jesús+Alejandra", "estado": "Arranque", "hito": "Visita espacio con Raúl sem 22 jun", "fecha": "22 jun", "bloqueador": "Pdte feedback reunión marketing", "constructora": "—", "fase": "ANTEPROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "REUNIÓN", "1": "PROY B", "4": "FUERA", "5": "PROY B", "11": "PROY E"}}, {"nombre": "TEPEYAC", "dept": "VIVIENDA", "resp": "Paula", "estado": "Valorando con Raúl", "hito": "Reunión cliente mié 24 jun", "fecha": "24 jun", "bloqueador": "—", "constructora": "Raúl", "fase": "PROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "REUNIÓN"}}, {"nombre": "DON RAMÓN", "dept": "HOTELES", "resp": "Marta", "estado": "Proyecto entregado", "hito": "Montaje 24-31ago · Visita Sevilla 25jun", "fecha": "25 jun", "bloqueador": "—", "constructora": "—", "fase": "PEDIDOS", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "REUNIÓN", "7": "MONTAJE", "9": "ENTREGA", "10": "ALEJANDRA"}}, {"nombre": "SANTANDER VIV", "dept": "VIVIENDA", "resp": "Sara", "estado": "Obra en curso", "hito": "Visita 29 jun (Sara+Alejandra)", "fecha": "29 jun", "bloqueador": "⚠ Solape deco con Ibiza (Sara)", "constructora": "Constructora cliente", "fase": "OBRA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"10": "PROY DECO"}}, {"nombre": "CAMINO SUR 70", "dept": "VIVIENDA", "resp": "Cristina+Nela+bec.", "estado": "Prep. montaje", "hito": "Montaje 6-10jul + 16-17jul", "fecha": "6 jul", "bloqueador": "Cerrar luminarias · Pedir exterior", "constructora": "—", "fase": "PEDIDOS", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"0": "PEDIDOS", "3": "MONTAJE"}}, {"nombre": "VALENCIA", "dept": "VIVIENDA", "resp": "Sara+Andrea+Ale", "estado": "Obra avanzando", "hito": "Montaje 21-24jul · Entrega 27jul (Ale)", "fecha": "21 jul", "bloqueador": "—", "constructora": "Raúl", "fase": "OBRA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"5": "MONTAJE", "6": "ALEJANDRA"}}, {"nombre": "ONE SHOT", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Obra por fases", "hito": "Montaje 27-30 jul", "fecha": "27 jul", "bloqueador": "Jesús vacaciones — Marta cubre", "constructora": "—", "fase": "OBRA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"6": "MONTAJE"}}, {"nombre": "CAMINO SUR 35", "dept": "VIVIENDA", "resp": "Nela(resp.)/Olatz", "estado": "Obra en estructura", "hito": "Reuniones cliente pdte confirmar", "fecha": "Sep 2026", "bloqueador": "Nela asumiendo el proyecto", "constructora": "Project Work", "fase": "OBRA", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {}}, {"nombre": "COBUE", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "estado": "Esperando cliente", "hito": "3 vistas en 1 sem tras recibir cambios", "fecha": "Pdte cliente", "bloqueador": "Cliente modifica distribución · 3 renders (renderista nuevo)", "constructora": "—", "fase": "ANTEPROYECTO", "atencion": "ALTA", "nivel": "ATENCIÓN ALTA", "tl": {"1": "PROY B"}}, {"nombre": "CARBON", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "estado": "Reactivado acústica", "hito": "Aceptación presupuesto + programar", "fecha": "Jun", "bloqueador": "Pdte aceptación", "constructora": "Empresa acústica", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {}}, {"nombre": "LAGOS 121", "dept": "VIVIENDA", "resp": "Alejandra + AUNA", "estado": "Proyecto nuevo", "hito": "Definir planning con AUNA", "fecha": "Jun", "bloqueador": "⚠ Modelo AUNA requiere más supervisión de la esperada — valorar tiempo/comisión", "constructora": "—", "fase": "PROYECTO", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"0": "PROY B", "10": "PROY DECO"}}, {"nombre": "IBIZA", "dept": "VIVIENDA", "resp": "Sara", "estado": "Obra — parón jul/ago", "hito": "Visita obra lun 22 jun (Sara) · Reunión deco 2-3 jul (Sara+Alejandra, primera de varias)", "fecha": "22 jun", "bloqueador": "⚠ Reunión 2-3jul coincide con semana de máximos montajes · Ale comprometida", "constructora": "Albañil local", "fase": "OBRA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"1": "VISITA·lun22", "3": "RCL·2-3jul"}}, {"nombre": "ALCALÁ 58", "dept": "VIVIENDA", "resp": "PM", "estado": "Obra en ejecución", "hito": "Fin obra mediados julio", "fecha": "Jul 2026", "bloqueador": "Sin montaje — cierra al acabar", "constructora": "Consultores Proy.", "fase": "OBRA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"4": "ENTREGA"}}, {"nombre": "LA FLORIDA", "dept": "VIVIENDA", "resp": "Paula/Alejandra", "estado": "Presupuesto+feedback", "hito": "Montaje ppios septiembre", "fecha": "Sep 2026", "bloqueador": "Proyecto 'amigo'", "constructora": "—", "fase": "PROYECTO", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"0": "PROY DECO", "8": "MONTAJE", "9": "ALEJANDRA"}}, {"nombre": "LA RINCONADA", "dept": "VIVIENDA", "resp": "Cristina", "estado": "Proyecto", "hito": "Presupuesto aceptado 1ª sem sep", "fecha": "Sep 2026", "bloqueador": "—", "constructora": "Raúl", "fase": "PROYECTO", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"0": "PROY DECO", "5": "PEDIDOS", "7": "FUERA", "11": "MONTAJE"}}, {"nombre": "SANTANDER REST", "dept": "RESTAURANTES", "resp": "Admón/Alejandra", "estado": "Conflicto judicial", "hito": "Gestión cobros", "fecha": "En curso", "bloqueador": "Disputa económica", "constructora": "—", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"0": "Gestión judicial"}}, {"nombre": "MARTÍNEZ CAMPOS", "dept": "HOTELES", "resp": "Jesús", "estado": "Esperando cliente", "hito": "Pendiente Comunidad de Madrid", "fecha": "Sin fecha", "bloqueador": "Burocracia", "constructora": "Raúl (previsto)", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {"12": "PROY B"}}, {"nombre": "HOTEL ÚNICO BCN", "dept": "HOTELES", "resp": "Marta", "estado": "Proyecto entregado", "hito": "Videollamada arranque obra", "fecha": "Sin fecha", "bloqueador": "Sin fechas del cliente", "constructora": "—", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {}}, {"nombre": "HOTEL SEVILLA", "dept": "HOTELES", "resp": "Marta", "estado": "Reactivando", "hito": "Pendiente planificación", "fecha": "Sin fecha", "bloqueador": "Problemas cliente", "constructora": "—", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "SEGUIMIENTO", "tl": {}}, {"nombre": "ROCA MAYA", "dept": "HOTELES", "resp": "Jesús/Marta", "estado": "Supervisión activa", "hito": "Entrega exteriores", "fecha": "Jun", "bloqueador": "—", "constructora": "—", "fase": "SUPERVISIÓN", "atencion": "NORMAL", "nivel": "ESTABLE", "tl": {}}, {"nombre": "VIV PALOMA RD", "dept": "VIVIENDA", "resp": "Olatz", "estado": "Obra en curso", "hito": "Fin obra mar2027 · deco oct/nov", "fecha": "Mar 2027", "bloqueador": "Sin equipo propio allí", "constructora": "—", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "ESTABLE", "tl": {"0": "REUNIÓN", "10": "PROY DECO"}}, {"nombre": "VÍA 66", "dept": "HOTELES", "resp": "Jesús", "estado": "Proyecto entregado", "hito": "Supervisión obra", "fecha": "Mar 2027", "bloqueador": "Solo supervisión", "constructora": "—", "fase": "SUPERVISIÓN", "atencion": "NORMAL", "nivel": "ESTABLE", "tl": {}}, {"nombre": "NUEVO MALLORCA", "dept": "RESTAURANTES", "resp": "Laia", "estado": "Espera licencia", "hito": "Posible sorpresa distribución", "fecha": "Sin fecha", "bloqueador": "Licencia en tramitación", "constructora": "—", "fase": "ESPERA", "atencion": "NORMAL", "nivel": "ESTABLE", "tl": {"7": "FUERA", "11": "PROY DECO"}}, {"nombre": "GONZALO CÓRDOBA", "dept": "HOTELES", "resp": "Jesús", "estado": "Supervisión activa", "hito": "Consultas continuas", "fecha": "Continuo", "bloqueador": "—", "constructora": "—", "fase": "SUPERVISIÓN", "atencion": "NORMAL", "nivel": "ESTABLE", "tl": {}}, {"nombre": "AYALA OFICINAS", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Supervisión puntual", "hito": "Consultas ocasionales", "fecha": "Continuo", "bloqueador": "—", "constructora": "—", "fase": "SUPERVISIÓN", "atencion": "NORMAL", "nivel": "ESTABLE", "tl": {}}, {"nombre": "HABITACIÓN ABI", "dept": "VIVIENDA", "resp": "Andrea", "estado": "Sigue abierto — cliente pide algo más", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha concreta", "nivel": "—", "tl": {"0": "Cliente pide algo más — sigue abierto"}}, {"nombre": "ANTIC COLONIAL", "dept": "VIVIENDA", "resp": "—", "estado": "Colaboración a ritmo lento", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {}}, {"nombre": "JAIME PESQUERA", "dept": "VIVIENDA", "resp": "Paula", "estado": "Parado — retomar septiembre", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sep 2026", "nivel": "—", "tl": {"0": "Retomar septiembre"}}, {"nombre": "ANA HONTANAR", "dept": "VIVIENDA", "resp": "Paula", "estado": "Parado — retomar septiembre", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sep 2026", "nivel": "—", "tl": {"0": "Retomar septiembre"}}, {"nombre": "MONTALBÁN", "dept": "VIVIENDA", "resp": "Olatz", "estado": "Sin movimiento", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {"0": "Sin movimiento"}}, {"nombre": "JOANN DOMINICANA", "dept": "RESTAURANTES", "resp": "Sofía", "estado": "Pendiente arranque — mismo cliente que Joann", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {"0": "Pendiente arranque"}}, {"nombre": "HOTEL GIJÓN", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Sin noticias del cliente", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {"0": "Sin noticias"}}, {"nombre": "PANTANO RURAL", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Posible reactivación", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {"0": "Posible reactivación"}}, {"nombre": "4 MASOS", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Posible reactivación", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {"0": "Posible reactivación"}}, {"nombre": "BLESS", "dept": "HOTELES", "resp": "Marta/Jesús", "estado": "Zonas comunes — sin fecha", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {"0": "Zonas comunes"}}, {"nombre": "CASA KORREOS", "dept": "HOTELES", "resp": "Jesús", "estado": "Esperando feedback Comunidad de Madrid", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "—", "atencion": "Sin fecha", "nivel": "—", "tl": {}}];
-const ALERTAS = [{"proj": "MONTESQUINZA", "dept": "VIVIENDA", "resp": "Sara/Andrea/Nela", "text": "Entrega proyecto Consultores esta sem", "fecha": "Esta semana", "risk": "CRITICO"}, {"proj": "PEDRAZA", "dept": "VIVIENDA", "resp": "Olatz+Paula+becaria", "text": "Visita jue 18 + Montaje 6-14jul + 15-24jul — Falta atrezzo · Color suelo · Conflicto Olatz/Paula", "fecha": "Jue 18 jun", "risk": "CRITICO"}, {"proj": "JOANN", "dept": "RESTAURANTES", "resp": "Sofía", "text": "Render Salón/Estudio sem 22 jun — Compromiso Alejandra con clienta", "fecha": "22 jun", "risk": "CRITICO"}, {"proj": "ALTHEON", "dept": "RESTAURANTES", "resp": "Laia", "text": "Presentación Barcelona lun 22 jun — ⚠ Presentación sin terminar esta semana", "fecha": "Lun 22 jun", "risk": "CRITICO"}, {"proj": "LAGOS 132", "dept": "RESTAURANTES", "resp": "Sofía+equipo REST", "text": "Reunión clientes jue 25 jun (pdte) — Instalaciones sin cerrar", "fecha": "25 jun", "risk": "CRITICO"}, {"proj": "ZAHARA", "dept": "VIVIENDA", "resp": "Paula+Alejandra", "text": "Montaje 13-15jul · Riesgo Raúl — Raúl puede no terminar a tiempo", "fecha": "13 jul", "risk": "CRITICO"}, {"proj": "GAMAL RD", "dept": "RESTAURANTES", "resp": "Sofía+Olatz+Ale", "text": "Montaje 13-26 jul (viaje RD) — ⚠ Olatz: Pedraza→Gamal sin pausa", "fecha": "13 jul", "risk": "CRITICO"}, {"proj": "BERNABÉU", "dept": "RESTAURANTES", "resp": "Laia+Naiara", "text": "Fecha montaje + 3ª persona ppios jul — ⚠ Alfombra crítica · 3ª persona sin resolver", "fecha": "Ppios jul", "risk": "CRITICO"}, {"proj": "PUERTO RICO", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "text": "Cerrar aceptación + visitas Amboage — ⚠ Riesgo Amboage (FOX+volumen aquí)", "fecha": "Jun", "risk": "ALTO"}, {"proj": "RUBAIYAT", "dept": "RESTAURANTES", "resp": "Naiara", "text": "Montaje 3-4 semanas (local abierto) — Local abierto — por fases", "fecha": "Jun/Jul", "risk": "ALTO"}, {"proj": "FOX", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "text": "Coordinar cierre carpintería — Carpintería retrasada y deficiente", "fecha": "Jun/Jul", "risk": "ALTO"}, {"proj": "VIUDA ALDAMA", "dept": "VIVIENDA", "resp": "Cristina (resp.) + Sara (apoyo)", "text": "Traspaso Sara→Cristina esta sem · fotomontajes · sem22: renders · avanzar sótano — Natalia va a escribir a Alejandra · Raúl valorando sin noticias · traspaso ordenado urgente", "fecha": "Esta semana", "risk": "ALTO"}, {"proj": "HERMOSILLA", "dept": "VIVIENDA", "resp": "Nela(resp.)/Olatz", "text": "Presionar Raumplan para presupuesto — Raumplan sin presupuesto", "fecha": "Esta semana", "risk": "ALTO"}, {"proj": "ABUBILLA", "dept": "VIVIENDA", "resp": "Andrea", "text": "Poner límite al cliente — 3 meses desde '2 semanas para revisar'", "fecha": "Esta semana", "risk": "ALTO"}, {"proj": "HIPÓDROMO", "dept": "RESTAURANTES", "resp": "Laia+Naiara", "text": "Visita jue 18 jun + glosario completo — Falta atrezzo y accesorios baños", "fecha": "Jue 18 jun", "risk": "ALTO"}, {"proj": "TORRE VALENCIA", "dept": "VIVIENDA", "resp": "Paula", "text": "Reunión Emir jue 18 jun — baños — Ecobuild sin planning cerrado", "fecha": "Jue 18 jun", "risk": "ALTO"}, {"proj": "VINCCI VALENCIA", "dept": "HOTELES", "resp": "Marta/Jesús", "text": "Deadline ZZCC vie 19 jun", "fecha": "Vie 19 jun", "risk": "ALTO"}, {"proj": "LAGOS 105", "dept": "VIVIENDA", "resp": "Andrea", "text": "Reunión cliente+Pedro lun 22 jun — Glosario deco pendiente", "fecha": "Lun 22 jun", "risk": "ALTO"}, {"proj": "PSN OFICINAS", "dept": "HOTELES", "resp": "Jesús+Alejandra", "text": "Visita espacio con Raúl sem 22 jun — Pdte feedback reunión marketing", "fecha": "22 jun", "risk": "ALTO"}, {"proj": "TEPEYAC", "dept": "VIVIENDA", "resp": "Paula", "text": "Reunión cliente mié 24 jun", "fecha": "24 jun", "risk": "ALTO"}, {"proj": "DON RAMÓN", "dept": "HOTELES", "resp": "Marta", "text": "Montaje 24-31ago · Visita Sevilla 25jun", "fecha": "25 jun", "risk": "ALTO"}, {"proj": "SANTANDER VIV", "dept": "VIVIENDA", "resp": "Sara", "text": "Visita 29 jun (Sara+Alejandra) — ⚠ Solape deco con Ibiza (Sara)", "fecha": "29 jun", "risk": "ALTO"}, {"proj": "CAMINO SUR 70", "dept": "VIVIENDA", "resp": "Cristina+Nela+bec.", "text": "Montaje 6-10jul + 16-17jul — Cerrar luminarias · Pedir exterior", "fecha": "6 jul", "risk": "ALTO"}, {"proj": "VALENCIA", "dept": "VIVIENDA", "resp": "Sara+Andrea+Ale", "text": "Montaje 21-24jul · Entrega 27jul (Ale)", "fecha": "21 jul", "risk": "ALTO"}, {"proj": "ONE SHOT", "dept": "HOTELES", "resp": "Marta/Jesús", "text": "Montaje 27-30 jul — Jesús vacaciones — Marta cubre", "fecha": "27 jul", "risk": "ALTO"}, {"proj": "CAMINO SUR 35", "dept": "VIVIENDA", "resp": "Nela(resp.)/Olatz", "text": "Reuniones cliente pdte confirmar — Nela asumiendo el proyecto", "fecha": "Sep 2026", "risk": "ALTO"}, {"proj": "COBUE", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "text": "3 vistas en 1 sem tras recibir cambios — Cliente modifica distribución · 3 renders (renderista nuevo)", "fecha": "Pdte cliente", "risk": "ALTO"}];
-const MONTAJES = [{"fechas": "6–10 jul", "proj": "Camino Sur 70", "equipo": "Cristina / Olatz", "dept": "Vivienda"}, {"fechas": "6–14 jul", "proj": "Pedraza 1º", "equipo": "Olatz + Paula", "dept": "Vivienda"}, {"fechas": "13–15 jul", "proj": "Zahara", "equipo": "Paula + Alejandra", "dept": "Vivienda"}, {"fechas": "13–26 jul", "proj": "Gamal RD", "equipo": "Sofía · Olatz · Alejandra", "dept": "Vivienda"}, {"fechas": "21–24 jul", "proj": "Valencia", "equipo": "Sara + Andrea + Alejandra", "dept": "Vivienda"}, {"fechas": "24–31 ago", "proj": "Don Ramón", "equipo": "Marta", "dept": "Hoteles"}];
-const PRESENCIA_ALE = [{"fecha": "Lun 22 jun", "texto": "Presentación Altheon en Barcelona con Laia"}, {"fecha": "25 jun", "texto": "Viaje a Sevilla con Marta y Sara — Don Ramón"}, {"fecha": "13–15 jul", "texto": "Zahara — montaje"}, {"fecha": "20 jul", "texto": "Gamal RD — viaje a República Dominicana"}, {"fecha": "21–24 jul", "texto": "Valencia — entrega oficial con Sara y Andrea"}, {"fecha": "15–19 jun · 3–21 ago", "texto": "Vacaciones"}];
-const PROXIMAS = [{"sem": "22 jun", "alerta": "MEDIO", "items": ["Reunión Lagos 105 + Pedro (PM cliente)", "Reunión Tepeyac (24 jun)", "Visita PSN con Raúl", "Paula de vacaciones desde lun 22", "Altheon — presentación Barcelona (Laia + Alejandra)"]}, {"sem": "6–10 jul", "alerta": "CRITICO", "items": ["🚨 MÁXIMOS MONTAJES: CaminoSur70 (6-10) + Pedraza 1º (6-14)", "Gamal RD arranca el 13", "Equipo muy distribuido"]}, {"sem": "13–17 jul", "alerta": "CRITICO", "items": ["🚨 Zahara (13-15) + Pedraza 2º (15-24) + Gamal RD en curso", "Jesús inicia vacaciones (13 jul)", "Conflicto Olatz/Paula sin resolver"]}, {"sem": "20–24 jul", "alerta": "ALTO", "items": ["Gamal RD (Alejandra entra 20)", "Valencia montaje (21-24)", "One Shot Bilbao (27-30, Marta)"]}, {"sem": "3–21 ago", "alerta": "CRITICO", "items": ["Estudio muy reducido — vacaciones generalizadas", "Bernabéu montaje agosto sin resolver", "Challan vacaciones 1–15 ago ⚠"]}];
-const CHALLAN = [{"prio": "URGENTE", "proj": "LAGOS 132", "dept": "VIVIENDA", "resp": "Sofía/PM", "fase": "F1→F2", "estado": "Reunión diseño fue jue 5 jun ✅. DAR FEEDBACK HOY a Challan.", "comprometida": "Pendiente definir", "realista": "Pendiente feedback hoy", "next": "DAR FEEDBACK HOY — ¿avanzamos a F2?", "riesgo": "CRITICO"}, {"prio": "URGENTE", "proj": "VIUDA DE ALDAMA", "dept": "VIVIENDA", "resp": "Sara/Cristina", "fase": "F1 correcciones", "estado": "Reunión clientes HOY. Tras reunión → paquete correcciones a Challan.", "comprometida": "2-3 semanas", "realista": "Sem 23-27 jun", "next": "HOY tras reunión → paquete correcciones en un solo envío", "riesgo": "CRITICO"}, {"prio": "URGENTE", "proj": "JOANN", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "fase": "R1→R2→R3 semanal", "estado": "Entrega+Distribución entregados ✅. Sofía con vista Entrada (R1) ahora. Salón(22jun) y Comedor(29jun) siguen.", "comprometida": "15/22/29 jun (semanal)", "realista": "⚠️ Inviable semanal — proponer bloques 2-3 sem", "next": "Adelantado sobre Lagos 105 — ritmo semanal satura Challan. Renegociar a bloques.", "riesgo": "CRITICO"}, {"prio": "MEDIO", "proj": "LA RINCONADA", "dept": "VIVIENDA", "resp": "Cristina", "fase": "F1 arrancando", "estado": "Challan arrancó HOY. Solo 1 espacio.", "comprometida": "Sem 16-19 jun", "realista": "Sem 16-19 jun", "next": "Capturas disponibles semana que viene", "riesgo": "MEDIO"}, {"prio": "MEDIO", "proj": "COBUE", "dept": "RESTAURANTES", "resp": "Sofía/Laia/Naiara", "fase": "F1 pendiente", "estado": "⚠ Los 3 renders de Cobue se probarán con renderista NUEVO (no Challan). Pendiente definir quién y cuándo.", "comprometida": "Por definir", "realista": "~Sem 22 jun", "next": "Tras reunión 11 jun → documentación a Challan", "riesgo": "MEDIO"}, {"prio": "URGENTE", "proj": "LAGOS 105", "dept": "VIVIENDA", "resp": "Andrea", "fase": "F1 pendiente", "estado": "Reunión cliente+Pedro(PM) confirmada 22 jun. Activar Challan HOY/mañana para llegar.", "comprometida": "22 jun", "realista": "Si activa hoy → ~16-17 jun ✅", "next": "DAR ORDEN HOY — detrás de Jo Ann en cola", "riesgo": "CRITICO"}];
-const CHALLAN_FLUJO = [{"fase": "F1", "titulo": "Volumetría y capturas", "desc": "Planos + 3D + vistas marcadas. ~1 semana desde doc completa. Capturas IA internas primero → reunión cliente para definir dirección."}, {"fase": "F2", "titulo": "Materialidad y acabados", "desc": "Toda la info de acabados y mobiliario. 2–3 días solo acabados · 1 semana si hay mobiliario. Cambios: 1–2 días/ronda."}, {"fase": "F3", "titulo": "Render final", "desc": "TODAS las correcciones cerradas ANTES de renderizar. 2 días render + 1–2 días por ronda adicional."}];
-const CHALLAN_REGLAS = ["Máx. 2–3 proyectos activos simultáneos con Challan.", "Nunca activar sin documentación 100% completa.", "PM es el filtro — nadie pasa trabajo sin visto bueno del PM.", "Correcciones en un solo paquete — nunca por separado.", "Antes de F3: confirmar que no hay más correcciones pendientes.", "Al firmar contrato con renders: verificar cola y validar fecha realista ANTES de comprometerse."];
-const CHALLAN_VAC = "🏖 Challan de vacaciones 1–15 agosto — cualquier render previsto en agosto debe cerrarse ANTES del 1 ago.";
-const FOCO_SEMANA = {"javi": ["Resolver conflicto Paula/Olatz julio", "HOY: seguimiento VivPaloma RD", "MAÑANA: visita Hipódromo (jue18)", "Seguir Lagos105 para lun22", "ABUBILLA: límite cliente", "ALTHEON: asegurar que Laia termina esta semana"], "sofia": ["JOANN: render Salón/Estudio esta semana", "MAÑANA: visita Hipódromo (jue18)", "Puerto Rico: presionar aceptación presupuestos", "Amboage: coordinar visitas taller"], "laia": ["⚠ ALTHEON: terminar presentación HOY/MAÑANA para reunión lun22 Barcelona", "Bernabéu: alfombra crítica, confirmar montaje", "MAÑANA: visita Hipódromo (jue18)"], "paula": ["MAÑANA JUE 18: visita Pedraza + reunión Torre Valencia (Emir, baños)", "Tepeyac: reunión cliente mié 24jun", "🏖 Vacaciones desde lunes 22 jun"], "sara": ["Montesquinza: cerrar entrega a Consultores esta semana (con Nela)", "Viuda Aldama: sem 29jun proyecto Hall", "Santander: visita 29jun con Alejandra", "Ibiza: presupuesto Amboage carpintería", "VIUDA ALDAMA URGENTE: enviar fotomontajes esta semana + avanzar sótano (cliente preocupada, va a escribir a Alejandra)", "VIUDA ALDAMA: traspaso ordenado a Cristina esta semana"], "naiara": ["Bernabéu: alfombra crítica", "Rubaiyat: montaje en curso", "MAÑANA: visita Hipódromo (jue18)"], "olatz": ["HOY: reunión VivPaloma RD en estudio", "MAÑANA: visita Pedraza", "Hermosilla: presionar Raumplan + coordinar traspaso a Nela", "⚠ Resolver conflicto Pedraza 2ºmontaje(15-24jul) vs Gamal(desde 15jul)"], "marta": ["⚠ Deadline MAÑANA VIE 19: propuesta ZZCC Vincci", "Don Ramón: preparar logística montaje 24-31ago + visita Sevilla 25jun"], "andrea": ["Lagos 105: preparar reunión lun 22jun (medidas, glosario deco)", "Abubilla: poner límite al cliente", "🏖 Vacaciones JUE 18 + VIE 19"], "cristina": ["Camino Sur 70: cerrar precio luminarias + pedir exterior antes montaje 6-10jul", "Rinconada: objetivo presupuesto aceptado 1ª sem septiembre", "VIUDA ALDAMA: asumir como responsable — recibir traspaso de Sara esta semana", "fotomontajes urgentes", "reuniones semanales con Natalia comprometidas"], "nela": ["Montesquinza: cerrar entrega a Consultores esta semana", "Hermosilla y Camino Sur 35: asumir como responsable (apoyo Olatz)", "⚠ No coge vacaciones en agosto — disponible"], "jesus": ["PSN: pendiente feedback reunión marketing 11jun", "Preparar visita espacio con Raúl semana 22jun", "Vía 66: supervisión obra"], "ale": ["🏖 Vacaciones esta semana (15-19jun)", "Vuelve lunes 22jun: ALTHEON Barcelona, reunión PSN, Lagos105", "Julio: Zahara(13-15), Gamal(20), Valencia entrega(27)"]};
-const PROJS_PERSONA = {"javi": ["LAGOS 132", "ALCALÁ 58"], "alicia": ["PEDRAZA", "LAGOS 105", "HERMOSILLA", "TORRE VALENCIA", "ALCALÁ 58"], "olatz": ["CAMINO SUR 70", "PEDRAZA", "VIV GAMAL STO DOMINGO", "VIV PALOMA RD"], "paula": ["ZAHARA", "LA FLORIDA", "TEPEYAC", "TORRE VALENCIA"], "sara": ["VALENCIA", "VIUDA ALDAMA", "SANTANDER VIV", "IBIZA", "MONTESQUINZA"], "andrea": ["VIV PALOMA RD", "VALENCIA", "MONTESQUINZA", "LAGOS 105"], "cristina": ["CAMINO SUR 70", "LA RINCONADA"], "nela": ["MONTESQUINZA", "CAMINO SUR 35", "HERMOSILLA"], "sofia": ["LAGOS 132", "VIV GAMAL STO DOMINGO", "JOANN", "FOX", "PUERTO RICO", "COBUE"], "laia": ["FOX", "BERNABÉU", "ALTHEON", "HIPÓDROMO", "COBUE"], "naiara": ["FOX", "BERNABÉU", "RUBAIYAT", "HIPÓDROMO"], "marta": ["DON RAMÓN", "ONE SHOT BILBAO", "VINCCI VALENCIA"], "jesus": ["ONE SHOT BILBAO", "ROCA MAYA", "VÍA 66", "MARTÍNEZ CAMPOS", "PSN OFICINAS"], "ale": []};
-const DEPT_PERSONA = {"javi": "todos", "alicia": "Vivienda", "olatz": "Vivienda", "paula": "Vivienda", "sara": "Vivienda", "andrea": "Vivienda", "cristina": "Vivienda", "nela": "Vivienda", "sofia": "Restaurantes", "laia": "Restaurantes", "naiara": "Restaurantes", "marta": "Hoteles", "jesus": "Hoteles", "ale": "todos"};
-const NOMBRE_PERSONA = {"javi": "Javi", "alicia": "Alicia", "olatz": "Olatz", "paula": "Paula", "sara": "Sara", "andrea": "Andrea", "cristina": "Cristina", "nela": "Nela", "sofia": "Sofía", "laia": "Laia", "naiara": "Naiara", "marta": "Marta", "jesus": "Jesús", "ale": "Alejandra"};
-const VAC = {"ale": "15–19 jun · 3–21 ago", "andrea": "15–19 jun · 3–21 ago", "javi": "3–21 ago", "paula": "22 jun – 21 ago", "sara": "3–21 ago", "cristina": "20 jul – 10 ago", "olatz": "17–28 ago", "sofia": "10–24 ago", "laia": "3–14 ago", "naiara": "6–10 jul · 17–21 ago", "marta": "3–7 ago", "jesus": "13–31 jul"};
-const AGENDA = [{"when": "Lun–Vie", "text": "Alejandra y Andrea de vacaciones"}, {"when": "Mar 17", "text": "Pedraza — visita + arranque traslado de mobiliario (Olatz + Paula)"}, {"when": "Mar 17", "text": "Viv Paloma RD — reunión en el estudio con Paloma y Alaa (Olatz)"}, {"when": "Jue 18", "text": "Torre Valencia — reunión con Emir para cerrar diseño de baños (Paula)"}, {"when": "Jue 18", "text": "Hipódromo — visita con Sofía, Laia, Naiara y PM"}, {"when": "Vie 19", "text": "Vincci Valencia — deadline propuesta revestimiento ZZCC (Marta)"}, {"when": "Toda la sem.", "text": "Montesquinza — entrega proyecto completo a Consultores (Sara + Nela)"}, {"when": "Toda la sem.", "text": "Joann — render Entrada/Salón Central (compromiso semanal · Sofía)"}, {"when": "Toda la sem.", "text": "Altheon — terminar presentación para reunión 22 jun en Barcelona (Laia)"}];
+const MASTER_DATA = [{"id": "pedraza", "nombre": "PEDRAZA", "dpto": "VIVIENDA", "equipo": ["Olatz"], "estado": "Montaje 23 oct", "hito": "Montaje 23 oct · Pedidos ampliación en curso", "fecha": "23 oct", "bloqueador": "2ª fase caballerías por definir", "constructora": "Amarco", "fase": "MONTAJE", "atencion": "CONTROLADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "23/10/26", "entrega": "Oct'26", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "En curso"}, {"id": "valencia", "nombre": "VALENCIA", "dpto": "VIVIENDA", "equipo": ["Sara", "Andrea"], "estado": "Entregado 29 ago", "hito": "Mobiliario exterior mediados sep", "fecha": "Sep 2026", "bloqueador": "Problemas de obra asumidos", "constructora": "Raúl", "fase": "REMATES", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "Oct-Nov'26", "entrega": "Nov'26", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "alcala_58", "nombre": "ALCALÁ 58", "dpto": "VIVIENDA", "equipo": ["Javi"], "estado": "Remates", "hito": "Fijar fecha remates → reunión cierre final", "fecha": "Oct/Nov 2026", "bloqueador": "—", "constructora": "Consultores Proy.", "fase": "REMATES", "atencion": "CONTROLADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "Sí"}, {"id": "la_florida", "nombre": "LA FLORIDA", "dpto": "VIVIENDA", "equipo": ["Paula"], "estado": "Obra en ejecución", "hito": "Montaje última semana sep", "fecha": "Sep 2026", "bloqueador": "Paula debe visitar obra para confirmar fecha", "constructora": "—", "fase": "OBRA", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "Sep/Oct'26", "entrega": "Oct'26", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "la_rinconada", "nombre": "LA RINCONADA", "dpto": "VIVIENDA", "equipo": ["Cristina", "Nela"], "estado": "Fin obra próximo — todo listo", "hito": "FIN OBRA 30 oct · MONTAJE OFICIAL 3 nov", "fecha": "Nov 2026", "bloqueador": "—", "constructora": "Raúl", "fase": "FIN OBRA", "atencion": "CONTROLADO", "nivel": "30 oct 2026", "obs": "3 nov 2026", "fin_obra": "30 oct'26", "montaje": "3 nov'26", "entrega": "Nov'26", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "Sí"}, {"id": "viuda_de_aldama_3", "nombre": "VIUDA DE ALDAMA 3", "dpto": "VIVIENDA", "equipo": ["Nela", "Andrea"], "estado": "Standby", "hito": "Pendiente señal cliente", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "STANDBY", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "viuda_de_aldama_2", "nombre": "VIUDA DE ALDAMA 2", "dpto": "VIVIENDA", "equipo": ["Sin asignar"], "estado": "Proyecto nuevo", "hito": "Primera reunión oct (semana 4) — definir responsable", "fecha": "2027", "bloqueador": "Sin responsable asignado", "constructora": "—", "fase": "PENDIENTE", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "santander_viv", "nombre": "SANTANDER VIV", "dpto": "VIVIENDA", "equipo": ["Sara", "Cristina", "Andrea"], "estado": "En curso — decisiones pendientes cliente", "hito": "Elaborar calendario avances + cerrar decisiones cliente", "fecha": "Ene 2027", "bloqueador": "Cliente no cierra por falta de presupuesto propio. Posibles cambios.", "constructora": "Constructora cliente", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "Ene 2027", "obs": "", "fin_obra": "Ene'27", "montaje": "TBD", "entrega": "TBD", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Pendiente", "pedidos_confirmados": "No"}, {"id": "ibiza", "nombre": "IBIZA", "dpto": "VIVIENDA", "equipo": ["Sara"], "estado": "Carpintería aprobada", "hito": "Aprobación presu carpintería → fijar fecha medición", "fecha": "Dic 2026", "bloqueador": "Pendiente aprobación presupuesto carpintería para arrancar fabricación.", "constructora": "Albañil local", "fase": "PEDIDOS", "atencion": "CONTROLADO", "nivel": "Dic 2026", "obs": "Ene 2027", "fin_obra": "Dic'26", "montaje": "Ene'27", "entrega": "Feb'27", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "En proceso"}, {"id": "hermosilla", "nombre": "HERMOSILLA", "dpto": "VIVIENDA", "equipo": ["Nela", "Olatz"], "estado": "Obra parada", "hito": "Contactar cliente", "fecha": "Mar 2027", "bloqueador": "⚠ Cliente no contesta. Obra parada.", "constructora": "Raumplan", "fase": "OBRA PARADA", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "montesquinza", "nombre": "MONTESQUINZA", "dpto": "VIVIENDA", "equipo": ["Sara", "Andrea"], "estado": "Planos actualizados enviados", "hito": "Actualización valoración constructora → reunión cliente", "fecha": "Mar 2027", "bloqueador": "PE aún por cerrar. Valoración constructora con nuevo PE pendiente.", "constructora": "Consultores Proy.", "fase": "PROY E", "atencion": "CONTROLADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Pendiente", "pedidos_confirmados": "No"}, {"id": "gamal_sto_domingo", "nombre": "GAMAL STO. DOMINGO", "dpto": "VIVIENDA", "equipo": ["Sofía", "Olatz"], "estado": "Remates en fabricación", "hito": "Pendiente recibir piezas fabricadas en España", "fecha": "—", "bloqueador": "Sin fecha de entrega de fabricación.", "constructora": "—", "fase": "REMATES", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "camino_sur_70", "nombre": "CAMINO SUR 70", "dpto": "VIVIENDA", "equipo": ["Cristina", "Nela"], "estado": "Remates", "hito": "Decisión exterior pendiente", "fecha": "—", "bloqueador": "Decisión exterior por cerrar", "constructora": "—", "fase": "REMATES", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "camino_sur_35", "nombre": "CAMINO SUR 35", "dpto": "VIVIENDA", "equipo": ["Nela", "Sofía", "Naiara"], "estado": "Comunicar retraso renders al cliente", "hito": "Comunicar a cliente: renders se retrasan · Fin obra oct 2028", "fecha": "Oct 2028", "bloqueador": "⚠ Hay que comunicar al cliente el retraso del planning de renders.", "constructora": "Project Work", "fase": "RENDERS", "atencion": "ATENCIÓN ALTA", "nivel": "Oct 2028", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No", "pedidos_confirmados": "No"}, {"id": "torre_valencia", "nombre": "TORRE VALENCIA", "dpto": "VIVIENDA", "equipo": ["Paula"], "estado": "Proyecto ejecución — cliente sin decisiones", "hito": "Contactar cliente", "fecha": "2027", "bloqueador": "Cliente sin decisiones — contactar", "constructora": "Ecobuild", "fase": "PROY E", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "paseo_lagos_105", "nombre": "PASEO LAGOS 105", "dpto": "VIVIENDA", "equipo": ["Nela", "Andrea"], "estado": "Proyecto básico", "hito": "Reunión clientes (renders) + actualizar mediciones constructora", "fecha": "2027", "bloqueador": "Dos frentes pendientes: reunión renders + mediciones sin actualizar.", "constructora": "Raúl/Jamena", "fase": "PROY B", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Pendiente", "pedidos_confirmados": "No"}, {"id": "pesquera", "nombre": "PESQUERA", "dpto": "VIVIENDA", "equipo": ["Paula"], "estado": "Pedidos / inicio obra pendiente", "hito": "Inicio obra oct si presu ok", "fecha": "Dic 2026", "bloqueador": "—", "constructora": "—", "fase": "PEDIDOS", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "paseo_lagos_121", "nombre": "PASEO LAGOS 121", "dpto": "VIVIENDA", "equipo": ["Nela", "Olatz"], "estado": "Proyecto en curso", "hito": "Ale revisa → fijar reunión cliente", "fecha": "Feb 2027", "bloqueador": "⚠ Ale debe revisar proyecto y deco antes de reunión. Sin revisión, reunión bloqueada.", "constructora": "—", "fase": "PROY DECO", "atencion": "ATENCIÓN ALTA", "nivel": "Nav 2026", "obs": "Ene 2027", "fin_obra": "Nav'26", "montaje": "Ene'27", "entrega": "Feb'27", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Pendiente", "pedidos_confirmados": "No"}, {"id": "viv_paloma_rd", "nombre": "VIV PALOMA RD", "dpto": "VIVIENDA", "equipo": ["Olatz", "Andrea"], "estado": "Proyecto deco", "hito": "Reunión septiembre", "fecha": "Jul 2027", "bloqueador": "—", "constructora": "—", "fase": "PROY DECO", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "Jul'27", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "tepeyac", "nombre": "TEPEYAC", "dpto": "VIVIENDA", "equipo": ["Paula"], "estado": "Parado", "hito": "Decisión cliente nov o ene", "fecha": "2027", "bloqueador": "Sin reunión programada", "constructora": "Raúl", "fase": "PENDIENTE", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "fox_la_despensa", "nombre": "FOX + LA DESPENSA", "dpto": "RESTAURANTES", "equipo": ["Sofía", "Naiara"], "estado": "Remates — mueble tocador pendiente", "hito": "Amboage: pendiente fecha entrega tocador", "fecha": "—", "bloqueador": "Amboage no da fecha para mueble tocador. Posible proyecto nuevo del cliente (sin confirmar).", "constructora": "Amboage", "fase": "REMATES", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "puerto_rico", "nombre": "PUERTO RICO", "dpto": "RESTAURANTES", "equipo": ["Sofía"], "estado": "Esperando decisión pavimento + techo", "hito": "Confirmar pavimento + elegir techo → revisar carpintería completa", "fecha": "Oct/Nov 2026", "bloqueador": "Pendiente confirmación pavimento + decisión techo (enviado ayer). Sin esas decisiones no se puede cerrar carpintería.", "constructora": "Amboage(pdte cambio)", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Enviado/pdte", "pedidos_confirmados": "No"}, {"id": "rubaiyat_madrid", "nombre": "RUBAIYAT MADRID", "dpto": "RESTAURANTES", "equipo": ["Sofía", "Naiara"], "estado": "Nueva distribución cerrada", "hito": "Desarrollar proyecto desde nueva distribución", "fecha": "—", "bloqueador": "Sin tiempo disponible ahora. Proyecto recién reorientado.", "constructora": "—", "fase": "PROY DECO", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No", "pedidos_confirmados": "No"}, {"id": "rubaiyat_são_paulo", "nombre": "RUBAIYAT SÃO PAULO", "dpto": "RESTAURANTES", "equipo": ["Naiara"], "estado": "Distribución cerrada — entrega PE ~7 nov", "hito": "Entregar PE ~7 noviembre · Obra ene-feb · Obj. 15 feb", "fecha": "15 feb 2027", "bloqueador": "⚠ Compromiso entrega PE en 1 mes (aprox 7 nov). Plazo ajustado.", "constructora": "Constructora local", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "mallorca_sevilla", "nombre": "MALLORCA SEVILLA", "dpto": "RESTAURANTES", "equipo": ["Naiara"], "estado": "Obra muy avanzada — alzados y detalles urgentes", "hito": "Entregar alzados y detalles YA — quieren terminar antes fin año", "fecha": "Dic 2026", "bloqueador": "⚠ Alzados y detalles sin entregar. Ya deberían estar. Cliente quiere terminar antes de fin de año.", "constructora": "—", "fase": "OBRA", "atencion": "ALERTA", "nivel": "Dic 2026", "obs": "", "fin_obra": "Dic'26", "montaje": "TBD", "entrega": "TBD", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Enviado/pdte", "pedidos_confirmados": "No"}, {"id": "hipodromo", "nombre": "HIPÓDROMO", "dpto": "RESTAURANTES", "equipo": ["Sofía", "Naiara"], "estado": "Respuesta Patrimonio en preparación", "hito": "Contestar requerimiento Patrimonio — plazo 10 días (~17 oct)", "fecha": "17 oct", "bloqueador": "Requerimiento Patrimonio recibido. Plazo interno: respuesta antes del 17 oct.", "constructora": "4 constructoras", "fase": "PDTE LIC", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No", "pedidos_confirmados": "No"}, {"id": "viv_joann_anteproy", "nombre": "VIV JOANN (Anteproy.)", "dpto": "RESTAURANTES", "equipo": ["Sofía"], "estado": "PE parcial en octubre", "hito": "Reunión clienta mañana 8 oct · PE parcial oct (rev+ilum+techos+dist)", "fecha": "Oct 2026", "bloqueador": "PE parcial urgente: revestimientos, iluminación, techos y distribución — necesario para proyecto arquitectura.", "constructora": "—", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "cobue", "nombre": "COBUE", "dpto": "RESTAURANTES", "equipo": ["Sofía", "Naiara"], "estado": "Obra iniciada el 5 oct", "hito": "Primera visita viernes 10 oct · Apertura 21 ene 2027", "fecha": "21 ene 2027", "bloqueador": "—", "constructora": "—", "fase": "OBRA", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "Oct'26", "montaje": "—", "entrega": "21 ene'27", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Enviado/pdte", "pedidos_confirmados": "No"}, {"id": "paseo_lagos_132", "nombre": "PASEO LAGOS 132", "dpto": "RESTAURANTES", "equipo": ["Sofía", "Naiara"], "estado": "Reunión obra semanal (miércoles) · Acabados por cerrar", "hito": "Reunión clienta renders + cambios · Cerrar acabados oct", "fecha": "Oct 2026", "bloqueador": "Acabados pendientes de cerrar. Clienta debe ver renders y confirmar cambios.", "constructora": "Ferbocar", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Pendiente", "pedidos_confirmados": "No"}, {"id": "one_shot_bilbao", "nombre": "ONE SHOT BILBAO", "dpto": "HOTELES", "equipo": ["Marta"], "estado": "Obra — fin 26 oct", "hito": "Jesús visita obra 19 oct · Fin obra + Marta 26 oct", "fecha": "Oct 2026", "bloqueador": "Montaje solapado — sin fecha cierre montaje (~1 mes pero sin certeza)", "constructora": "Martínez Otero", "fase": "OBRA", "atencion": "ATENCIÓN ALTA", "nivel": "26 oct 2026", "obs": "Nov 2026 (sin confirmar)", "fin_obra": "—", "montaje": "TBD", "entrega": "TBD", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "roca_maya", "nombre": "ROCA MAYA", "dpto": "HOTELES", "equipo": ["Marta", "Jesús"], "estado": "Renders habitaciones mandados", "hito": "Priorizar renderista ZZ.CC./exterior — deadline comercialización feb", "fecha": "Sem Santa 2027", "bloqueador": "ZZ.CC. y exterior pendientes. Deadline comercialización feb.", "constructora": "—", "fase": "PROY E + RENDERS", "atencion": "ATENCIÓN ALTA", "nivel": "Sem Santa 2027", "obs": "", "fin_obra": "Sem Santa'27", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No", "pedidos_confirmados": "No"}, {"id": "via_66", "nombre": "VÍA 66", "dpto": "HOTELES", "equipo": ["Jesús"], "estado": "F1 cerrada · F2 arranca ene'27", "hito": "F2 ene'27: hab+lobby ~3m · F3 verano: desayunador", "fecha": "Ene 2027", "bloqueador": "—", "constructora": "Martínez Otero", "fase": "REMATES F1", "atencion": "CONTROLADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "Ene'27", "entrega": "Ene'27", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "Sí"}, {"id": "psn_portal", "nombre": "PSN PORTAL", "dpto": "HOTELES", "equipo": ["Jesús"], "estado": "Presupuesto en preparación — entrega 13 oct", "hito": "Entregar presupuesto martes 13 oct", "fecha": "13 oct", "bloqueador": "⚠ Entrega martes 13 oct. Estimado encaja, revisión pendiente.", "constructora": "—", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No", "pedidos_confirmados": "No"}, {"id": "casa_almagro", "nombre": "CASA ALMAGRO", "dpto": "HOTELES", "equipo": ["Jesús", "Marta"], "estado": "PE en curso — Adqua valorando", "hito": "Entregar PE en octubre → Adqua valora en noviembre", "fecha": "Oct 2026", "bloqueador": "PE no terminado. Objetivo interno: entregar oct.", "constructora": "—", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "hotel_sevilla", "nombre": "HOTEL SEVILLA", "dpto": "HOTELES", "equipo": ["Marta"], "estado": "Sin planning — ⚠ LLAMAR", "hito": "Llamar para pedir planning actualizado", "fecha": "—", "bloqueador": "⚠ Sin noticias. Sin planning realista. Si no responden: mail bomba.", "constructora": "—", "fase": "PROY E", "atencion": "ALERTA", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "Entregado/pdte", "pedidos_confirmados": "No"}, {"id": "hotel_gijon", "nombre": "HOTEL GIJÓN", "dpto": "HOTELES", "equipo": ["Marta", "Jesús"], "estado": "En espera — temas estructurales", "hito": "Pendiente info estructural", "fecha": "—", "bloqueador": "Temas estructurales en curso. Sin avance hasta info estructural.", "constructora": "—", "fase": "PENDIENTE", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "vincci_valencia", "nombre": "VINCCI VALENCIA", "dpto": "HOTELES", "equipo": ["Marta", "Jesús"], "estado": "En licitación de mobiliario", "hito": "Piloto enero 2027 · Fin julio 2027", "fecha": "Jul 2027", "bloqueador": "—", "constructora": "—", "fase": "PROY E", "atencion": "ATENCIÓN ALTA", "nivel": "Jul 2027", "obs": "Ene 2027 (piloto)", "fin_obra": "Jul'27", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "casa_korreos", "nombre": "CASA KORREOS", "dpto": "HOTELES", "equipo": ["Jesús"], "estado": "Pendiente Patrimonio", "hito": "Esperar resolución Patrimonio", "fecha": "—", "bloqueador": "Pendiente respuesta Patrimonio", "constructora": "—", "fase": "PROY E", "atencion": "SEGUIMIENTO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "gonzalo_cordoba", "nombre": "GONZALO CÓRDOBA", "dpto": "HOTELES", "equipo": ["Jesús"], "estado": "Supervisión puntual", "hito": "Consultas puntuales", "fecha": "Continuo", "bloqueador": "—", "constructora": "—", "fase": "SUPERVISION", "atencion": "ESTABLE", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "ayala_oficinas", "nombre": "AYALA OFICINAS", "dpto": "HOTELES", "equipo": ["Ale", "Jesús"], "estado": "Pedidos iniciándose", "hito": "Confirmar pago cliente → lanzar pedidos completos", "fecha": "Ene 2027", "bloqueador": "—", "constructora": "—", "fase": "PEDIDOS", "atencion": "CONTROLADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "Ene'27", "entrega": "Ene'27", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "Pdte lanzar"}, {"id": "don_ramon", "nombre": "DON RAMÓN", "dpto": "HOTELES", "equipo": ["Marta"], "estado": "En espera — sin honorarios", "hito": "Pendiente respuesta honorarios", "fecha": "—", "bloqueador": "No han contestado a honorarios. Ampliación para terraza.", "constructora": "—", "fase": "LATENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "hotel_unico_bcn", "nombre": "HOTEL ÚNICO BCN", "dpto": "HOTELES", "equipo": ["Marta"], "estado": "En espera — sin señales", "hito": "—", "fecha": "—", "bloqueador": "Sin señales. Parece que están sacando presu obra+mobiliario.", "constructora": "—", "fase": "LATENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "ana_hontanar", "nombre": "ANA HONTANAR", "dpto": "VIVIENDA", "equipo": ["Paula"], "estado": "En espera", "hito": "Después de verano", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "habitacion_abi", "nombre": "HABITACIÓN ABI", "dpto": "VIVIENDA", "equipo": ["Andrea"], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "antic_colonial", "nombre": "ANTIC COLONIAL", "dpto": "VIVIENDA", "equipo": [], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "montalban", "nombre": "MONTALBÁN", "dpto": "VIVIENDA", "equipo": ["Olatz"], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "joann_dominicana", "nombre": "JOANN DOMINICANA", "dpto": "RESTAURANTES", "equipo": ["Sofía"], "estado": "En espera", "hito": "Pendiente entrar", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "sophie", "nombre": "SOPHIE", "dpto": "RESTAURANTES", "equipo": ["Sofía"], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "pantano_rural", "nombre": "PANTANO RURAL", "dpto": "HOTELES", "equipo": [], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "masos", "nombre": "4 MASOS", "dpto": "HOTELES", "equipo": [], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "bless", "nombre": "BLESS", "dpto": "HOTELES", "equipo": [], "estado": "En espera", "hito": "—", "fecha": "—", "bloqueador": "—", "constructora": "—", "fase": "PENDIENTE", "atencion": "PARADO", "nivel": "—", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "vivienda", "nombre": "VIVIENDA", "dpto": "", "equipo": [], "estado": "", "hito": "—", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "—", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "restaurantes", "nombre": "RESTAURANTES", "dpto": "", "equipo": [], "estado": "", "hito": "—", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "—", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "rubaiyat_sp", "nombre": "276 RUBAIYAT SP", "dpto": "", "equipo": [], "estado": "", "hito": "Visita realizada. Distribución CERRADA. PE en octubre → pedidos nov/dic → obra enero.", "fecha": "Oct'26", "bloqueador": "Plazo muy ajustado. Cualquier retraso en PE rompe el objetivo de arranque en enero.", "constructora": "—", "fase": "Proyecto ejecución", "atencion": "", "nivel": "", "obs": "Avanzar PE sin pausa. Entregar antes de fin de octubre.", "fin_obra": "—", "montaje": "Ene'27", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No iniciados", "pedidos_confirmados": "No"}, {"id": "hoteles", "nombre": "HOTELES", "dpto": "", "equipo": [], "estado": "", "hito": "—", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "—", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "info_faltante_datos_insuficientes_o_pend", "nombre": "🔵 INFO FALTANTE — Datos insuficientes o pendientes de update", "dpto": "", "equipo": [], "estado": "", "hito": "—", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "—", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "v_aldama_3", "nombre": "271 V. ALDAMA 3", "dpto": "", "equipo": [], "estado": "", "hito": "Standby. Deco y presupuesto listos. Esperando cliente.", "fecha": "TBD", "bloqueador": "Sin estado actual.", "constructora": "—", "fase": "Obra parada", "atencion": "", "nivel": "", "obs": "Solicitar update.", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "Sí", "presupuesto_deco_aceptado": "Sí", "pedidos_confirmados": "No"}, {"id": "v_aldama_2", "nombre": "273 V. ALDAMA 2", "dpto": "", "equipo": [], "estado": "", "hito": "Primera reunión oct w4. Sin responsable asignado.", "fecha": "TBD", "bloqueador": "Sin responsable asignado.", "constructora": "—", "fase": "Pendiente", "atencion": "", "nivel": "", "obs": "Definir responsable antes de reunión oct w4.", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "gamal_sto_dom", "nombre": "231 GAMAL STO. DOM.", "dpto": "", "equipo": [], "estado": "", "hito": "Sin información actualizada reciente.", "fecha": "—", "bloqueador": "Sin estado actual.", "constructora": "—", "fase": "Sin dato", "atencion": "", "nivel": "", "obs": "Solicitar update.", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "viv_joann_ap", "nombre": "270 VIV JOANN (AP)", "dpto": "", "equipo": [], "estado": "", "hito": "Planimetría distribución + iluminación en curso. Acabados: nov. Detalles/carpintería: posterior.", "fecha": "Nov'26", "bloqueador": "PE parcial en marcha. Sin update desde 30 sep.", "constructora": "—", "fase": "PE parcial", "atencion": "", "nivel": "", "obs": "Confirmar estado entrega PE parcial.", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "No", "presupuesto_deco_aceptado": "No", "pedidos_confirmados": "No"}, {"id": "foxla_despensa", "nombre": "252 FOX+LA DESPENSA", "dpto": "", "equipo": [], "estado": "", "hito": "Apertura oficial 30 sep. Riesgo carpintero última hora.", "fecha": "Oct'26", "bloqueador": "Sin update post-apertura.", "constructora": "—", "fase": "Remates", "atencion": "", "nivel": "", "obs": "Solicitar update. ¿Remates resueltos?", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "martinez_campos", "nombre": "269 MARTÍNEZ CAMPOS", "dpto": "", "equipo": [], "estado": "", "hito": "Sin información actualizada reciente.", "fecha": "—", "bloqueador": "Sin estado actual.", "constructora": "—", "fase": "Sin dato", "atencion": "", "nivel": "", "obs": "Solicitar update.", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "controlado_situacion_conocida_y_gestiona", "nombre": "🟢 CONTROLADO — Situación conocida y gestionada", "dpto": "", "equipo": [], "estado": "", "hito": "—", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "—", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "abubilla", "nombre": "ABUBILLA", "dpto": "VIV", "equipo": ["Paula", "Andrea"], "estado": "", "hito": "Cierre sep-oct", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "REMATES", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "carbon", "nombre": "CARBON", "dpto": "REST", "equipo": ["Sofía"], "estado": "", "hito": "Remate acústico · CONFIRMAR", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "REMATES", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "viv_joann", "nombre": "VIV JOANN", "dpto": "VIV", "equipo": ["Sofía", "Naiara"], "estado": "", "hito": "PE finales nov", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "PROY E", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "concurso_discesur", "nombre": "CONCURSO DISCESUR", "dpto": "REST", "equipo": ["Sin asignar"], "estado": "", "hito": "Deadline fin oct ⚠ URGENTE", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "CONCURSO", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "kanda_sa_pacheco", "nombre": "KANDA SA PACHECO", "dpto": "HOT", "equipo": ["Jesús", "Marta"], "estado": "", "hito": "Sin feedback cliente", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "SUPERVISIÓN", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "kanda_cat_suarez", "nombre": "KANDA CAT SUAREZ", "dpto": "HOT", "equipo": ["Jesús", "Marta"], "estado": "", "hito": "Sin feedback cliente", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "SUPERVISIÓN", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "rest_hotel_gava", "nombre": "REST HOTEL GAVA", "dpto": "HOT", "equipo": ["Marta"], "estado": "", "hito": "Pdte licencia · Obra oct si OK", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "PROY E · VALORACIÓN", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}, {"id": "viuda_aldama_3", "nombre": "VIUDA ALDAMA 3", "dpto": "VIV", "equipo": ["Nela", "Andrea"], "estado": "", "hito": "Obra parada · Cliente decide", "fecha": "—", "bloqueador": "", "constructora": "—", "fase": "OBRA PARADA", "atencion": "", "nivel": "", "obs": "", "fin_obra": "—", "montaje": "—", "entrega": "—", "deco_cerrada": "—", "presupuesto_deco_aceptado": "—", "pedidos_confirmados": "—"}];
+const GLOBAL_DATA = [{"id": "pedraza", "atencion": "CONTROLADO", "proximo_hito": "Montaje 23 oct. Ampliación deco acordada. Olatz ejecutando pedidos.", "fecha_hito": "23/10/26", "bloqueador": "En marcha con fecha cerrada.", "obs": "Confirmar todos los pedidos a tiempo.", "cuando": "Esta semana", "fase_real": "Pedidos / Montaje", "fin_obra": "—", "montaje": "23/10/26", "entrega": "Oct'26"}, {"id": "valencia", "atencion": "SEGUIMIENTO", "proximo_hito": "Recepción mobiliario terraza oct-nov. Sin update reciente.", "fecha_hito": "Nov'26", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Remates", "fin_obra": "—", "montaje": "Oct-Nov'26", "entrega": "Nov'26"}, {"id": "alcala_58", "atencion": "CONTROLADO", "proximo_hito": "Primera reunión de cierre realizada. Listado de remates elaborado. Próximo: fecha remates → reunión cierre final.", "fecha_hito": "Nov'26", "bloqueador": "Proceso de cierre claro y estructurado.", "obs": "Fijar fecha remates con cliente.", "cuando": "Esta semana", "fase_real": "Cierre del proyecto", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "la_florida", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Montaje 28 sep en curso. Sin update desde entonces.", "fecha_hito": "Oct'26", "bloqueador": "Sin información de estado actual post-montaje.", "obs": "Solicitar update a Paula.", "cuando": "Oct'26", "fase_real": "Remates / Montaje", "fin_obra": "—", "montaje": "Sep/Oct'26", "entrega": "Oct'26"}, {"id": "la_rinconada", "atencion": "CONTROLADO", "proximo_hito": "FIN OBRA 30 oct. MONTAJE 3 nov. Todo pedido y en almacenes.", "fecha_hito": "Nov'26", "bloqueador": "Completamente controlado.", "obs": "Coordinar logística montaje.", "cuando": "Oct'26", "fase_real": "Fin de obra / Montaje", "fin_obra": "30 oct'26", "montaje": "3 nov'26", "entrega": "Nov'26"}, {"id": "viuda_de_aldama_3", "atencion": "SEGUIMIENTO", "proximo_hito": "Pendiente señal cliente", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "STANDBY", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "viuda_de_aldama_2", "atencion": "SEGUIMIENTO", "proximo_hito": "Primera reunión oct (semana 4) — definir responsable", "fecha_hito": "2027", "bloqueador": "Sin responsable asignado", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "santander_viv", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Reunión celebrada. Decisiones tomadas pero cliente no cierra por falta de presupuesto propio. Posibles cambios de última hora.", "fecha_hito": "Ene'27", "bloqueador": "Sin cerrar decisiones cliente no hay planificación real. Riesgo retrasos acumulados.", "obs": "Elaborar calendario de avances y pendientes del cliente. Cerrar esta semana.", "cuando": "Esta semana", "fase_real": "Obra — decisiones deco pendientes", "fin_obra": "Ene'27", "montaje": "TBD", "entrega": "TBD"}, {"id": "ibiza", "atencion": "CONTROLADO", "proximo_hito": "Carpintería enviada y APROBADA. Pendiente aprobación presupuesto para arrancar fabricación + fijar fecha medición.", "fecha_hito": "Feb'27", "bloqueador": "Proceso avanzado. Único pendiente: aprobación económica presupuesto carpintería.", "obs": "Seguimiento aprobación presu. Fijar fecha medición en cuanto esté aprobado.", "cuando": "Esta semana", "fase_real": "Obra — carpintería aprobada", "fin_obra": "Dic'26", "montaje": "Ene'27", "entrega": "Feb'27"}, {"id": "hermosilla", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Cliente no contesta. Sin avance.", "fecha_hito": "TBD", "bloqueador": "Cliente no responde.", "obs": "Intentar contacto activo.", "cuando": "Oct'26", "fase_real": "Obra parada", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "montesquinza", "atencion": "CONTROLADO", "proximo_hito": "Planos actualizados + planos baños enviados a constructora. Pendiente actualización valoración con nuevo PE. PE por cerrar.", "fecha_hito": "TBD", "bloqueador": "Proceso en marcha y ordenado. PE no cerrado = constructora no actualiza definitivo.", "obs": "Cerrar PE. Esperar valoración constructora. Reunión cliente después.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "gamal_sto_domingo", "atencion": "SEGUIMIENTO", "proximo_hito": "Pendiente recibir piezas fabricadas en España", "fecha_hito": "—", "bloqueador": "Sin fecha de entrega de fabricación.", "obs": "", "cuando": "", "fase_real": "REMATES", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "camino_sur_70", "atencion": "SEGUIMIENTO", "proximo_hito": "Decisión exterior pendiente. Sin update reciente.", "fecha_hito": "TBD", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Remates", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "camino_sur_35", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Renders avanzados pero programación de vistas con cliente incumplida. Sin reunión fijada.", "fecha_hito": "TBD", "bloqueador": "Sin reunión fijada los renders no se validan y la deco no avanza.", "obs": "Cerrar fecha de reunión con cliente esta semana.", "cuando": "Esta semana", "fase_real": "Renders / Diseño deco", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "torre_valencia", "atencion": "SEGUIMIENTO", "proximo_hito": "Cliente sin decisiones.", "fecha_hito": "TBD", "bloqueador": "Cliente no avanza en decisiones.", "obs": "Contactar y presionar para decisiones.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "paseo_lagos_105", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Reunión con clientes pendiente (renders están con ellos). Mediciones sin actualizar para constructora.", "fecha_hito": "TBD", "bloqueador": "Renders entregados a clientes sin fecha de reunión. Mediciones no actualizadas = constructora bloqueada.", "obs": "Fijar reunión con clientes. Actualizar mediciones y pasar a constructora.", "cuando": "Esta semana", "fase_real": "Renders — coordinación constructora", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "pesquera", "atencion": "SEGUIMIENTO", "proximo_hito": "Inicio obra oct si presupuesto ok.", "fecha_hito": "Oct'26", "bloqueador": "Pendiente confirmación presupuesto.", "obs": "Confirmar presupuesto.", "cuando": "Oct'26", "fase_real": "Proyecto básico", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "paseo_lagos_121", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Avances en curso. Reunión cliente pendiente. Ale debe revisar proyecto y deco antes.", "fecha_hito": "Feb'27", "bloqueador": "Ale no ha revisado proyecto+deco → no se puede reunir con cliente → deco bloqueada.", "obs": "Ale revisa proyecto y deco. Fijar reunión cliente.", "cuando": "Esta semana", "fase_real": "Diseño deco — renders en curso", "fin_obra": "Nav'26", "montaje": "Ene'27", "entrega": "Feb'27"}, {"id": "viv_paloma_rd", "atencion": "SEGUIMIENTO", "proximo_hito": "Obra prevista jul'27. Sin avance previsto hasta acercarse la fecha.", "fecha_hito": "Jul'27", "bloqueador": "Sin urgencia inmediata.", "obs": "Seguimiento a su ritmo.", "cuando": "2027", "fase_real": "Pendiente deco", "fin_obra": "Jul'27", "montaje": "—", "entrega": "—"}, {"id": "tepeyac", "atencion": "SEGUIMIENTO", "proximo_hito": "Decisión cliente nov o ene.", "fecha_hito": "Ene'27", "bloqueador": "Pendiente decisión cliente.", "obs": "Hacer seguimiento.", "cuando": "Nov'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "fox_la_despensa", "atencion": "SEGUIMIENTO", "proximo_hito": "Amboage: pendiente fecha entrega tocador", "fecha_hito": "—", "bloqueador": "Amboage no da fecha para mueble tocador. Posible proyecto nuevo del cliente (sin confirmar).", "obs": "", "cuando": "", "fase_real": "REMATES", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "puerto_rico", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Renders finales pendientes de cerrar. Presu carpintería revisión (ha subido). Apertura abr'27 con dudas. Presu deco enviado pdte aceptación.", "fecha_hito": "Abr'27", "bloqueador": "Presupuesto carpintería subido — puede afectar decisión cliente.", "obs": "Cerrar renders. Resolver presupuesto carpintería con cliente.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "rubaiyat_madrid", "atencion": "SEGUIMIENTO", "proximo_hito": "Falta feedback cliente para definir proyecto. Habrá proyecto deco. Sin tiempos conocidos.", "fecha_hito": "TBD", "bloqueador": "Bloqueado esperando feedback cliente.", "obs": "Solicitar feedback para definir proyecto.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "rubaiyat_são_paulo", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Entregar PE ~7 noviembre · Obra ene-feb · Obj. 15 feb", "fecha_hito": "15 feb 2027", "bloqueador": "⚠ Compromiso entrega PE en 1 mes (aprox 7 nov). Plazo ajustado.", "obs": "", "cuando": "", "fase_real": "PROY E", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "mallorca_sevilla", "atencion": "ALERTA", "proximo_hito": "Reunión ayer (semana pasada) + reunión mañana 6 oct. Se ve progreso. Fin obra dic'26. Deco enviada pdte aceptación.", "fecha_hito": "Dic'26", "bloqueador": "Estado pendiente de actualización post-reunión 6 oct.", "obs": "Update tras reunión mañana. Definir estado deco y próximo hito.", "cuando": "6 oct'26", "fase_real": "Obra en curso", "fin_obra": "Dic'26", "montaje": "TBD", "entrega": "TBD"}, {"id": "hipodromo", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Nuevo requerimiento Patrimonio. 2 cuestiones a resolver internamente.", "fecha_hito": "TBD", "bloqueador": "Requerimiento Patrimonio no resuelto bloquea avance del proyecto.", "obs": "Revisar y resolver los 2 puntos de Patrimonio esta semana.", "cuando": "Esta semana", "fase_real": "Proyecto / Licencia", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "viv_joann_anteproy", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Reunión clienta mañana 8 oct · PE parcial oct (rev+ilum+techos+dist)", "fecha_hito": "Oct 2026", "bloqueador": "PE parcial urgente: revestimientos, iluminación, techos y distribución — necesario para proyecto arquitectura.", "obs": "", "cuando": "", "fase_real": "PROY E", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "cobue", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Cierre constructora objetivo 16 oct. Fin obra en el aire. Presu deco pdte aceptación. Apertura 21 ene.", "fecha_hito": "21 ene'27", "bloqueador": "Fin de obra en el aire. Sin aceptación deco.", "obs": "Confirmar cierre constructora 16 oct. Presionar aceptación deco.", "cuando": "16 oct'26", "fase_real": "Obra", "fin_obra": "Oct'26", "montaje": "—", "entrega": "21 ene'27"}, {"id": "paseo_lagos_132", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Reunión jueves 8 oct. Definición avanzada con cambios. Pendiente cerrar acabados para constructora.", "fecha_hito": "TBD", "bloqueador": "Acabados no cerrados = constructora no puede avanzar.", "obs": "Cerrar acabados en reunión del jueves y pasar a constructora inmediatamente.", "cuando": "Jueves 8 oct", "fase_real": "Definición acabados", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "one_shot_bilbao", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Viaje cancelado — no avanzaron. Dudas sobre entrega final. Sin nueva fecha confirmada.", "fecha_hito": "TBD", "bloqueador": "Sin nueva fecha de montaje el proyecto queda en el aire.", "obs": "Confirmar nueva fecha de entrega final.", "cuando": "Esta semana", "fase_real": "Montaje", "fin_obra": "—", "montaje": "TBD", "entrega": "TBD"}, {"id": "roca_maya", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Renders activados (2sem hab + 3sem zonas comunes + 3sem exteriores). Reuniones online semanales. FIN OBRA Sem Santa'27.", "fecha_hito": "Sem Santa'27", "bloqueador": "En proceso. Sin update reciente.", "obs": "Solicitar update progreso renders.", "cuando": "Oct'26", "fase_real": "PE + Renders", "fin_obra": "Sem Santa'27", "montaje": "—", "entrega": "—"}, {"id": "via_66", "atencion": "CONTROLADO", "proximo_hito": "F1 CERRADA. F2 ene'27: supervisión habitaciones + actualización lobby. F3 verano'27.", "fecha_hito": "Jul'27", "bloqueador": "Fases definidas y planificadas.", "obs": "Preparar F2 para enero.", "cuando": "Dic'26", "fase_real": "Remates F1 / F2 planificada", "fin_obra": "—", "montaje": "Ene'27", "entrega": "Ene'27"}, {"id": "psn_portal", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Visita con Raúl realizada. Estimado enviado sin feedback. Fichas mobiliario listas. Detalles carpintería en curso. PE ~entregado 30 sep.", "fecha_hito": "TBD", "bloqueador": "Estimado enviado sin respuesta del cliente.", "obs": "Hacer seguimiento del estimado enviado.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "casa_almagro", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Solo presentación y distribución — no es anteproyecto todavía. Reuniones en curso sin cerrar.", "fecha_hito": "TBD", "bloqueador": "Sin cierre. Reuniones en curso.", "obs": "Concretar decisión y cerrar anteproyecto.", "cuando": "Oct'26", "fase_real": "Anteproyecto", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "hotel_sevilla", "atencion": "ALERTA", "proximo_hito": "Arranca de nuevo. Revisión electricidad. Planning constructora pedido sin respuesta. Deco entregada — cliente valorándola por su lado.", "fecha_hito": "TBD", "bloqueador": "Constructora sin respuesta. Cliente valora deco por su cuenta.", "obs": "Insistir en planning constructora. Hacer seguimiento deco cliente.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "hotel_gijon", "atencion": "SEGUIMIENTO", "proximo_hito": "Temas estructurales e instalaciones en curso. Sin avance en nuestro proyecto hasta info estructural.", "fecha_hito": "TBD", "bloqueador": "Bloqueado esperando info estructural.", "obs": "Cuando llegue info estructural: revisar techos.", "cuando": "TBD", "fase_real": "Pendiente", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "vincci_valencia", "atencion": "ATENCIÓN ALTA", "proximo_hito": "Revisando planos accesibilidad. Constructora ejecutando. PILOTO ene'27. FIN OBRA jul'27.", "fecha_hito": "Jul'27", "bloqueador": "Sin mobiliario cerrado.", "obs": "Cerrar empresa de mobiliario.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "Jul'27", "montaje": "—", "entrega": "—"}, {"id": "casa_korreos", "atencion": "SEGUIMIENTO", "proximo_hito": "Pendiente respuesta comunicación contractual (urgente). Si cierra: entrega PE 3 nov. Presentación Patrimonio previa.", "fecha_hito": "Nov'26", "bloqueador": "Sin respuesta contractual el proyecto no arranca. Plazo PE muy ajustado.", "obs": "Insistir en respuesta contractual esta semana.", "cuando": "Urgente", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "gonzalo_cordoba", "atencion": "ESTABLE", "proximo_hito": "Consultas puntuales", "fecha_hito": "Continuo", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "SUPERVISION", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "ayala_oficinas", "atencion": "CONTROLADO", "proximo_hito": "Presu deco ACEPTADO 28 sep. Montaje movido a ene'27. Pedidos pendientes de cierre de pago del cliente.", "fecha_hito": "Ene'27", "bloqueador": "Pedidos bloqueados hasta que cliente cierre el pago.", "obs": "Confirmar pago → lanzar pedidos inmediatamente.", "cuando": "Esta semana", "fase_real": "Pedidos", "fin_obra": "—", "montaje": "Ene'27", "entrega": "Ene'27"}, {"id": "don_ramon", "atencion": "PARADO", "proximo_hito": "Sin información actualizada reciente.", "fecha_hito": "—", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Sin dato", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "hotel_unico_bcn", "atencion": "PARADO", "proximo_hito": "Sin información actualizada reciente.", "fecha_hito": "—", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Sin dato", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "ana_hontanar", "atencion": "PARADO", "proximo_hito": "Después de verano", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "habitacion_abi", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "antic_colonial", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "montalban", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "joann_dominicana", "atencion": "PARADO", "proximo_hito": "Pendiente entrar", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "sophie", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "pantano_rural", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "masos", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "bless", "atencion": "PARADO", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "—", "obs": "", "cuando": "", "fase_real": "PENDIENTE", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "vivienda", "atencion": "", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "—", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "restaurantes", "atencion": "", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "—", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "rubaiyat_sp", "atencion": "", "proximo_hito": "Visita realizada. Distribución CERRADA. PE en octubre → pedidos nov/dic → obra enero.", "fecha_hito": "Oct'26", "bloqueador": "Plazo muy ajustado. Cualquier retraso en PE rompe el objetivo de arranque en enero.", "obs": "Avanzar PE sin pausa. Entregar antes de fin de octubre.", "cuando": "Oct'26", "fase_real": "Proyecto ejecución", "fin_obra": "—", "montaje": "Ene'27", "entrega": "—"}, {"id": "hoteles", "atencion": "", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "—", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "info_faltante_datos_insuficientes_o_pend", "atencion": "", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "—", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "v_aldama_3", "atencion": "", "proximo_hito": "Standby. Deco y presupuesto listos. Esperando cliente.", "fecha_hito": "TBD", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Obra parada", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "v_aldama_2", "atencion": "", "proximo_hito": "Primera reunión oct w4. Sin responsable asignado.", "fecha_hito": "TBD", "bloqueador": "Sin responsable asignado.", "obs": "Definir responsable antes de reunión oct w4.", "cuando": "Oct'26", "fase_real": "Pendiente", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "gamal_sto_dom", "atencion": "", "proximo_hito": "Sin información actualizada reciente.", "fecha_hito": "—", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Sin dato", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "viv_joann_ap", "atencion": "", "proximo_hito": "Planimetría distribución + iluminación en curso. Acabados: nov. Detalles/carpintería: posterior.", "fecha_hito": "Nov'26", "bloqueador": "PE parcial en marcha. Sin update desde 30 sep.", "obs": "Confirmar estado entrega PE parcial.", "cuando": "Oct'26", "fase_real": "PE parcial", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "foxla_despensa", "atencion": "", "proximo_hito": "Apertura oficial 30 sep. Riesgo carpintero última hora.", "fecha_hito": "Oct'26", "bloqueador": "Sin update post-apertura.", "obs": "Solicitar update. ¿Remates resueltos?", "cuando": "Oct'26", "fase_real": "Remates", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "martinez_campos", "atencion": "", "proximo_hito": "Sin información actualizada reciente.", "fecha_hito": "—", "bloqueador": "Sin estado actual.", "obs": "Solicitar update.", "cuando": "Oct'26", "fase_real": "Sin dato", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "controlado_situacion_conocida_y_gestiona", "atencion": "", "proximo_hito": "—", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "—", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "abubilla", "atencion": "", "proximo_hito": "Cierre sep-oct", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "REMATES", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "carbon", "atencion": "", "proximo_hito": "Remate acústico · CONFIRMAR", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "REMATES", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "viv_joann", "atencion": "", "proximo_hito": "PE finales nov", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "PROY E", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "concurso_discesur", "atencion": "", "proximo_hito": "Deadline fin oct ⚠ URGENTE", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "CONCURSO", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "kanda_sa_pacheco", "atencion": "", "proximo_hito": "Sin feedback cliente", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "SUPERVISIÓN", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "kanda_cat_suarez", "atencion": "", "proximo_hito": "Sin feedback cliente", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "SUPERVISIÓN", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "rest_hotel_gava", "atencion": "", "proximo_hito": "Pdte licencia · Obra oct si OK", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "PROY E · VALORACIÓN", "fin_obra": "—", "montaje": "—", "entrega": "—"}, {"id": "viuda_aldama_3", "atencion": "", "proximo_hito": "Obra parada · Cliente decide", "fecha_hito": "—", "bloqueador": "", "obs": "", "cuando": "", "fase_real": "OBRA PARADA", "fin_obra": "—", "montaje": "—", "entrega": "—"}];
+const PLANNING_DATA = {"semanas": ["28 SEP", "5 OCT", "12 OCT", "19 OCT", "26 OCT", "2 NOV", "9 NOV", "16 NOV", "23 NOV", "30 NOV", "7 DIC", "14 DIC", "21 DIC", "28 DIC"], "meses": [["SEP", 0, 4], ["OCT", 5, 8], ["NOV", 9, 10]], "hoy": "12 OCT", "proyectos": [{"id": "one_shot_bilbao", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "5 OCT", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "12 OCT", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "19 OCT", "actividades": [{"texto": "ENTREGA"}]}]}, {"id": "la_florida", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "abubilla", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}, {"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "alcala_58", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "FIN OBRA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "pedraza", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "5 OCT", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "12 OCT", "actividades": [{"texto": "ENTREGA"}]}]}, {"id": "camino_sur_70", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}, {"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "valencia", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}, {"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "don_ramon", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}]}, {"id": "via_66", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}, {"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "fox_la_despensa", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "CIERRE"}]}]}, {"id": "carbon", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}]}, {"id": "la_rinconada", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "OBRA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "19 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "26 OCT", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "2 NOV", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "9 NOV", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "16 NOV", "actividades": [{"texto": "ENTREGA"}]}]}, {"id": "ibiza", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "OBRA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "19 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "26 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "montesquinza", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY B"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "19 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "26 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "cobue", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "OBRA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "19 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "26 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}, {"semana": "14 DIC", "actividades": [{"texto": "OBRA"}]}, {"semana": "21 DIC", "actividades": [{"texto": "OBRA"}]}, {"semana": "28 DIC", "actividades": [{"texto": "MONTAJE"}]}]}, {"id": "mallorca_sevilla", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "OBRA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "19 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "26 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "santander_viv", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "OBRA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PEDIDOS"}]}]}, {"id": "paseo_lagos_121", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "5 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "12 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "19 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PEDIDOS"}]}]}, {"id": "paseo_lagos_132", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "9 NOV", "actividades": [{"texto": "VALORACIÓN"}]}]}, {"id": "puerto_rico", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "5 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "12 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "19 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "26 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PEDIDOS"}]}]}, {"id": "rubaiyat_são_paulo", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "ANTEPROY."}]}, {"semana": "5 OCT", "actividades": [{"texto": "ANTEPROY."}]}]}, {"id": "ayala_oficinas", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "5 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "12 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "19 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "26 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "7 DIC", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "14 DIC", "actividades": [{"texto": "MONTAJE"}]}, {"semana": "21 DIC", "actividades": [{"texto": "ENTREGA"}]}]}, {"id": "bless", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY DECO"}]}]}, {"id": "paseo_lagos_105", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "RENDERS"}]}, {"semana": "5 OCT", "actividades": [{"texto": "RENDERS"}]}, {"semana": "12 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "19 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "camino_sur_35", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "RENDERS"}]}, {"semana": "5 OCT", "actividades": [{"texto": "RENDERS"}]}, {"semana": "12 OCT", "actividades": [{"texto": "RENDERS"}]}, {"semana": "19 OCT", "actividades": [{"texto": "RENDERS"}]}, {"semana": "26 OCT", "actividades": [{"texto": "RENDERS"}]}, {"semana": "2 NOV", "actividades": [{"texto": "RENDERS"}]}, {"semana": "9 NOV", "actividades": [{"texto": "RENDERS"}]}, {"semana": "16 NOV", "actividades": [{"texto": "RENDERS"}]}, {"semana": "23 NOV", "actividades": [{"texto": "RENDERS"}]}, {"semana": "30 NOV", "actividades": [{"texto": "RENDERS"}]}, {"semana": "7 DIC", "actividades": [{"texto": "RENDERS"}]}]}, {"id": "viv_joann", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY B"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY B"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "16 NOV", "actividades": [{"texto": "ENT. PROY"}]}]}, {"id": "pesquera", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY B"}]}, {"semana": "5 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "12 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "19 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "26 OCT", "actividades": [{"texto": "OBRA"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "concurso_discesur", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "CONCURSO"}]}, {"semana": "5 OCT", "actividades": [{"texto": "CONCURSO"}]}]}, {"id": "roca_maya", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PEDIDOS"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PEDIDOS"}]}]}, {"id": "psn_portal", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "ENT. PROY"}]}, {"semana": "12 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "19 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "26 OCT", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "casa_almagro", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "2 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "9 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "16 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "23 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "30 NOV", "actividades": [{"texto": "OBRA"}]}, {"semana": "7 DIC", "actividades": [{"texto": "OBRA"}]}]}, {"id": "vincci_valencia", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PROY E"}]}]}, {"id": "casa_korreos", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "2 NOV", "actividades": [{"texto": "ENT. PROY"}]}]}, {"id": "gonzalo_cordoba", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "5 OCT", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "12 OCT", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "19 OCT", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "26 OCT", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "2 NOV", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "9 NOV", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "16 NOV", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "23 NOV", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "30 NOV", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "7 DIC", "actividades": [{"texto": "SUPERVIS."}]}]}, {"id": "kanda_sa_pacheco", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "5 OCT", "actividades": [{"texto": "SUPERVIS."}]}]}, {"id": "kanda_cat_suarez", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "SUPERVIS."}]}, {"semana": "5 OCT", "actividades": [{"texto": "SUPERVIS."}]}]}, {"id": "hotel_unico_bcn", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}]}, {"id": "rest_hotel_gava", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "VALORACIÓN"}]}, {"semana": "5 OCT", "actividades": [{"texto": "VALORACIÓN"}]}]}, {"id": "viuda_aldama_3", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "EN ESPERA"}]}, {"semana": "5 OCT", "actividades": [{"texto": "EN ESPERA"}]}]}, {"id": "hotel_sevilla", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY E"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}]}, {"id": "viuda_de_aldama_3", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REUNIÓN"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY E"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PROY E"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PROY E"}]}]}, {"id": "hermosilla", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PENDIENTE"}]}]}, {"id": "gamal_sto_domingo", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REMATES"}]}]}, {"id": "torre_valencia", "timeline": [{"semana": "5 OCT", "actividades": [{"texto": "REMATES"}]}]}, {"id": "viv_paloma_rd", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "REUNIÓN"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PROY DECO"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PROY DECO"}]}]}, {"id": "tepeyac", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PENDIENTE"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PENDIENTE"}]}]}, {"id": "rubaiyat_madrid", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "ENTREGA"}]}]}, {"id": "hipodromo", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PDTE LIC"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PDTE LIC"}]}]}, {"id": "viv_joann_anteproy", "timeline": [{"semana": "28 SEP", "actividades": [{"texto": "PROY B"}]}, {"semana": "5 OCT", "actividades": [{"texto": "PROY B"}]}, {"semana": "12 OCT", "actividades": [{"texto": "PROY B"}]}, {"semana": "19 OCT", "actividades": [{"texto": "PROY B"}]}, {"semana": "26 OCT", "actividades": [{"texto": "PROY B"}]}, {"semana": "2 NOV", "actividades": [{"texto": "PROY B"}]}, {"semana": "9 NOV", "actividades": [{"texto": "PROY B"}]}, {"semana": "16 NOV", "actividades": [{"texto": "PROY B"}]}, {"semana": "23 NOV", "actividades": [{"texto": "PROY B"}]}, {"semana": "30 NOV", "actividades": [{"texto": "PROY B"}]}, {"semana": "7 DIC", "actividades": [{"texto": "PROY B"}]}]}]};
+const META = {"updated": "14 Oct 2026", "hoy_semana": "12 OCT"};
+const ALERTAS = [];
+const AGENDA = [];
+const MONTAJES = [];
+const ALE_ALERTAS = [];
+const ALE_HITOS = [];
+const ALE_MONTAJES = [];
+const ALE_PRESENCIA = [];
+const ALE_PROXIMAS = [];
+const RENDERS = [];
+const RENDERS_FLUJO = [{"fase": "F1", "titulo": "Volumetría y capturas", "desc": "Planos + 3D + vistas marcadas. ~1 semana desde doc completa."}, {"fase": "F2", "titulo": "Materialidad y acabados", "desc": "Toda la info de acabados y mobiliario. 2-3 días."}, {"fase": "F3", "titulo": "Render final", "desc": "TODAS las correcciones cerradas ANTES de renderizar."}];
+const RENDERS_REGLAS = ["Máx. 2-3 proyectos activos simultáneos por renderista.", "Nunca activar sin documentación 100% completa.", "PM es el filtro — nadie pasa trabajo sin visto bueno del PM."];
+const RENDERS_VAC = '';
+const FOCO_SEMANA = {"olatz": [], "sara": [], "andrea": [], "paula": [], "cristina": [], "nela": [], "sofia": [], "naiara": [], "marta": [], "jesus": []};
+const PROJS_PERSONA = {"olatz": [], "sara": [], "andrea": [], "paula": [], "cristina": [], "nela": [], "sofia": [], "naiara": [], "marta": [], "jesus": []};
+const DEPT_PERSONA = {"olatz": "Vivienda", "sara": "Vivienda", "andrea": "Vivienda", "paula": "Vivienda", "cristina": "Vivienda", "nela": "Vivienda", "sofia": "Vivienda", "naiara": "Vivienda", "marta": "Hoteles", "jesus": "Hoteles"};
+const NOMBRE_PERSONA = {"olatz": "Olatz", "sara": "Sara", "andrea": "Andrea", "paula": "Paula", "cristina": "Cristina", "nela": "Nela", "sofia": "Sofía", "naiara": "Naiara", "marta": "Marta", "jesus": "Jesús"};
+const VAC = {};
+const DEPT_SECTIONS = {"VIVIENDA": ["olatz", "sara", "andrea", "paula", "cristina", "nela", "sofia", "naiara"], "RESTAURANTES": [], "HOTELES": ["marta", "jesus"]};
+const PERSON_ORDER = ["javi", "ale", "olatz", "sara", "andrea", "paula", "cristina", "nela", "sofia", "naiara", "marta", "jesus"];
 
-const PERSON_ORDER = ["javi", "ale", "alicia", "olatz", "paula", "sara", "andrea", "cristina", "nela", "sofia", "laia", "naiara", "marta", "jesus"];
-
-</script>
 </script>
 <script>
-// APDS PM Estudio — Lógica de la app
+/* ============================================================
+   POMBO ESTUDIO — app.js
+   Usa MASTER_DATA, GLOBAL_DATA, PLANNING_DATA, META
+   ============================================================ */
 
-// ── HELPERS ──────────────────────────────────────────────────────────────────
-function deptCls(d){
-  d=(d||'').toLowerCase();
-  if(d.includes('vivienda')) return 'tag-viv';
-  if(d.includes('hotel')) return 'tag-hot';
-  if(d.includes('restaurante')||d.includes('rest')) return 'tag-rest';
-  return 'tag-out';
-}
-function riskCls(r){
-  r=(r||'').toUpperCase();
-  if(r.includes('CRITICO')||r.includes('CRÍTICO')||r.includes('MUY ALTO')) return 'tag-crit';
-  if(r==='ALTO') return 'tag-alto';
-  if(r==='MEDIO') return 'tag-med';
-  if(r==='BAJO') return 'tag-baj';
-  if(r.includes('VACACIONES')) return 'tag-vac';
-  return 'tag-out';
-}
-function riskLbl(r){
-  r=(r||'').toUpperCase();
-  if(r.includes('CRITICO')||r.includes('CRÍTICO')||r.includes('MUY ALTO')) return 'Crítico';
-  if(r==='ALTO') return 'Alto';
-  if(r==='MEDIO') return 'Medio';
-  if(r==='BAJO') return 'Bajo';
-  if(r.includes('VACACIONES')) return 'Vacaciones';
-  return r;
-}
-function phaseCls(p){
-  if(!p) return '';
-  const up = p.toUpperCase();
-  if(up.includes('PROYECTO')||up.includes('ANTEPROYECTO')||up.includes('PROY')||up.includes('BASICO')||up.includes('PRESUPUESTO')||up.includes('VALORACION')||up.includes('FEEDBACK')||up.includes('RENDER')||up.includes('REUNION')||up.includes('REUNIÓN')||up.includes('IDEAS')||up.includes('MARKETING')||up.includes('EMPEZAR')) return 'ph1';
-  if(up.includes('OBRA')||up.includes('EJECUCION')||up.includes('INICIO')||up.includes('EMPIEZA')||up.includes('OBRA DE NUEVO')) return 'ph2';
-  if(up.includes('PEDIDO')||up.includes('CARPINTER')||up.includes('CERRAR DECO')||up.includes('TECHOS')||up.includes('REVISAR EQUIPAMIENTO')) return 'ph3';
-  if(up.includes('MONTAJE')||up.includes('VISITA')) return 'ph4';
-  if(up.includes('ENTREGA')||up.includes('FIN OBRA')||up.includes('CIERRE')||up.includes('TERMINAD')) return 'ph6';
-  if(up.includes('RENDERS')||up.includes('DECO')) return 'ph7';
-  if(up.includes('PARADO')||up.includes('PENDIENTE')||up.includes('LICENCIA')||up.includes('REPLANTEO')) return 'ph9';
-  return 'ph5';
-}
-function phaseShort(p){
-  if(!p) return '';
-  const up = p.toUpperCase();
-  if(up.includes('MONTAJE')) return 'MONT';
-  if(up.includes('ANTEPROYECTO')) return 'ANT';
-  if(up.includes('PROY BASICO')||up.includes('PROYECTO BASICO')) return 'PB';
-  if(up.includes('PROYECTO')||up.includes('PROY')) return 'PROY';
-  if(up.includes('PRESUPUESTO')||up.includes('PRESU')) return 'PRES';
-  if(up.includes('VALORACION')||up.includes('VALORACIÓN')) return 'VAL';
-  if(up.includes('OBRA')) return 'OBRA';
-  if(up.includes('PEDIDO')) return 'PED';
-  if(up.includes('CARPINTER')) return 'CARP';
-  if(up.includes('REUNIÓN')||up.includes('REUNION')) return 'REUN';
-  if(up.includes('ENTREGA')) return 'ENT';
-  if(up.includes('RENDERS')||up.includes('RENDER')) return 'REND';
-  if(up.includes('DECO')&&!up.includes('INICIO')) return 'DECO';
-  if(up.includes('VISITA')) return 'VIS';
-  if(up.includes('FIN OBRA')) return 'FIN';
-  if(up.includes('CIERRE')||up.includes('CERRAR')) return 'CIE';
-  if(up.includes('PARADO')) return '—';
-  if(up.includes('PENDIENTE')) return 'PEN';
-  if(up.includes('LICENCIA')) return 'LIC';
-  if(up.includes('FEEDBACK')) return 'FB';
-  if(up.includes('EMPEZAR')||up.includes('EMPIEZA')) return 'INI';
-  if(up.includes('REPLANTEO')) return 'REP';
-  return p.slice(0,4).toUpperCase();
-}
-
-// ── STORAGE ──────────────────────────────────────────────────────────────────
+/* ── localStorage ─────────────────────────────────────────── */
 const S = {
-  _c: {},
-  load(id){
-    if(this._c[id]) return this._c[id];
-    let v = {check:{}, notes:{}};
-    try{ const ls = localStorage.getItem('apds:'+id); if(ls) v=JSON.parse(ls); }catch(e){}
-    this._c[id] = v; return v;
-  },
-  save(id){
-    try{ localStorage.setItem('apds:'+id, JSON.stringify(this._c[id])); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); }
-  },
-  setCheck(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].check[k]=v; this.save(id); },
-  setNote(id, k, v){ if(!this._c[id]) this._c[id]={check:{},notes:{}}; this._c[id].notes[k]=v; this.save(id); },
+  key:    (pid, f)    => `pombo_${pid}_${f}`,
+  get:    (pid, f, d='') => { try { return localStorage.getItem(S.key(pid,f)) ?? d; } catch { return d; } },
+  set:    (pid, f, v) => { try { localStorage.setItem(S.key(pid,f), v); } catch {} },
+  toggle: (pid, f)    => { const v = S.get(pid,f,'0')==='1'?'0':'1'; S.set(pid,f,v); return v==='1'; }
 };
 
-function setSyncStatus(s){
-  const el=document.getElementById('sync'); if(!el) return;
-  el.className='sync '+(s==='saving'?'saving':s==='error'?'error':'');
-  const dot=el.querySelector('.sync-dot'); if(dot) dot.className='sync-dot';
-  el.innerHTML=`<span class="sync-dot"></span>${s==='saving'?'Guardando…':s==='error'?'Sin conexión':'Sincronizado'}`;
+/* ── Índices ──────────────────────────────────────────────── */
+let _gIdx = null, _pIdx = null;
+
+function buildIndexes() {
+  _gIdx = {}; (GLOBAL_DATA||[]).forEach(g => { _gIdx[g.id] = g; });
+  _pIdx = {}; ((PLANNING_DATA||{}).proyectos||[]).forEach(p => { _pIdx[p.id] = p; });
 }
 
-// ── GANTT ──────────────────────────────────────────────────────────────────
-function renderGantt(proj, personId){
-  const tl = proj.tl || {};
-  const slug = proj.slug || proj.nombre.replace(/\s+/g,'_').toLowerCase();
-  const state = S._c[personId] || {check:{}, notes:{}};
+const globalOf = id => _gIdx?.[id] || null;
+const planOf   = id => _pIdx?.[id] || null;
 
-  // Cabecera meses
-  let monthsHtml = '';
-  MONTHS.forEach(([m, start, end]) => {
-    const span = end - start + 1;
-    monthsHtml += `<div class="gantt-month" style="grid-column:span ${span}">${m}</div>`;
+function enrich(p) {
+  return { ...p, _g: globalOf(p.id), _p: planOf(p.id) };
+}
+
+/* ── Semanas ──────────────────────────────────────────────── */
+// META.hoy_semana es el label string de la semana actual (p.ej. "5 OCT")
+const hoySemana = () => META?.hoy_semana || '';
+const VENTANA   = 6; // semanas hacia adelante en la tarjeta
+
+function semanaWindow() {
+  const sems = PLANNING_DATA?.semanas || [];
+  const i    = sems.indexOf(hoySemana());
+  if (i < 0) return sems.slice(0, VENTANA);
+  return sems.slice(i, i + VENTANA);
+}
+
+/* ── Personas ─────────────────────────────────────────────── */
+// Javier, Alejandra y Alicia no aparecen en las pestañas del equipo
+const EXCLUIR_PERSONAS = ['Alicia', 'Javier', 'Alejandra', 'Javi', 'alicia'];
+
+function getPersonas() {
+  const s = new Set();
+  (MASTER_DATA||[]).forEach(p => (p.equipo||[]).forEach(n => {
+    if (n && typeof n === 'string' && n.trim() && !/^\d+$/.test(n.trim())
+        && !EXCLUIR_PERSONAS.includes(n.trim())) {
+      s.add(n.trim());
+    }
+  }));
+  return [...s].sort();
+}
+
+/* ── Nivel de atención ────────────────────────────────────── */
+function atLevel(proj) {
+  const a = (proj._g?.atencion || proj.atencion || '').toUpperCase();
+  if (a.includes('MÁXIMA') || a.includes('MAXIMA')) return 0;
+  if (a.includes('ALTA'))                            return 1;
+  if (a.includes('SEGUIMIENTO'))                     return 2;
+  return 3;
+}
+
+/* ── Helpers estilo ──────────────────────────────────────── */
+function deptTag(dpto) {
+  const d = (dpto||'').toUpperCase();
+  if (d.includes('VIVIENDA'))    return ['tag-viv',  'VIVIENDA'];
+  if (d.includes('RESTAURANTE')) return ['tag-rest', 'REST'];
+  if (d.includes('HOTEL'))       return ['tag-hot',  'HOTEL'];
+  return ['tag-out', dpto||'—'];
+}
+
+function riskTag(nivel) {
+  const n = (nivel||'').toUpperCase();
+  if (n.includes('MÁXIMA')||n.includes('MAXIMA')) return ['tag-crit','● ALERTA'];
+  if (n.includes('ALTA'))                          return ['tag-alto','● ATENCIÓN'];
+  if (n.includes('SEGUIMIENTO'))                   return ['tag-med', '● INFO'];
+  if (n.includes('ESTABLE'))                       return ['tag-baj', '● OK'];
+  return ['tag-out','—'];
+}
+
+function tagHtml(cls, txt) {
+  return `<span class="tag ${cls}">${txt}</span>`;
+}
+
+/* ── Helpers texto ───────────────────────────────────────── */
+function abrev(txt) {
+  if (!txt) return '';
+  const t = txt.toUpperCase();
+  if (t.includes('ANTEPR'))  return 'APY';
+  if (t.includes('PROY'))    return 'PRY';
+  if (t.includes('VALORAC')) return 'VAL';
+  if (t.includes('OBRA'))    return 'OBR';
+  if (t.includes('MONTAJ'))  return 'MNT';
+  if (t.includes('ENTREGA')) return 'ENT';
+  if (t.includes('RENDER'))  return 'RND';
+  if (t.includes('VISITA'))  return 'VIS';
+  if (t.includes('PEDIDO'))  return 'PED';
+  if (t.includes('REMATE'))  return 'REM';
+  if (t.includes('PARAD') || t.includes('ESPERA') || t.includes('STANDBY')) return '···';
+  return txt.slice(0,3).toUpperCase();
+}
+
+// Colores coherentes con PLANNING_POMBO
+function faseColor(txt) {
+  const t = (txt||'').toUpperCase();
+  if (t.includes('ANTEPR'))  return 'ph1';
+  if (t.includes('PROY') || t.includes('DISEÑO') || t.includes('VALORAC')) return 'ph1';
+  if (t.includes('OBRA'))    return 'ph2';
+  if (t.includes('MONTAJ'))  return 'ph3';
+  if (t.includes('ENTREGA')) return 'ph4';
+  if (t.includes('RENDER'))  return 'ph5';
+  if (t.includes('VISITA'))  return 'ph6';
+  if (t.includes('PEDIDO') || t.includes('REMATE')) return 'ph7';
+  if (t.includes('PARAD') || t.includes('ESPERA') || t.includes('STANDBY')) return 'ph9';
+  return 'ph1';
+}
+
+function row2(k, v) {
+  if (!v || v === '—' || v === 'None') return '';
+  return `<tr>
+    <td style="color:var(--ink3);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+               padding:4px 0;width:130px;vertical-align:top;">${k}</td>
+    <td style="padding:4px 0;font-size:12.5px;">${v}</td>
+  </tr>`;
+}
+
+function row2Always(k, v) {
+  return `<tr>
+    <td style="color:var(--ink3);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+               padding:4px 0;width:130px;vertical-align:top;">${k}</td>
+    <td style="padding:4px 0;font-size:12.5px;color:${(!v||v==='—')?'var(--ink3)':'inherit'};">${v||'Sin fecha registrada'}</td>
+  </tr>`;
+}
+
+/* ── Activity helpers ────────────────────────────────────── */
+function projHasActivityThisWeek(proj) {
+  const hoy = hoySemana();
+  return (proj._p?.timeline||[]).some(t => t.semana === hoy);
+}
+
+function projHasActivityInWindow(proj, startOffset, endOffset) {
+  const allSems = PLANNING_DATA?.semanas || [];
+  const hoyIdx  = allSems.indexOf(hoySemana());
+  if (hoyIdx < 0) return false;
+  const win = allSems.slice(hoyIdx + startOffset, hoyIdx + endOffset + 1);
+  return (proj._p?.timeline||[]).some(t => win.includes(t.semana));
+}
+
+/* ── Gantt tarjeta (ventana operativa compacta) ──────────── */
+function ganttGeneral(proj) {
+  const ventana  = semanaWindow();
+  const allSems  = PLANNING_DATA?.semanas || [];
+  const hoy      = hoySemana();
+  if (!ventana.length) return '';
+
+  // Determinar si el proyecto está oficialmente parado
+  const estadoRaw = (proj.estado || proj._g?.fase_real || proj.fase || '').toUpperCase();
+  const isParado  = /PARAD|ESPERA|STANDBY|STOP|HOLD/.test(estadoRaw);
+
+  // Rango activo en TODO el planning (no solo en la ventana)
+  const timeline   = proj._p?.timeline || [];
+  const activeSems = new Set(timeline.filter(t => t.actividades?.length).map(t => t.semana));
+  let firstActive  = null, lastActive = null;
+  allSems.forEach(sem => {
+    if (activeSems.has(sem)) {
+      if (!firstActive) firstActive = sem;
+      lastActive = sem;
+    }
   });
-  // rellenar hasta 20
-  const filled = MONTHS.reduce((a,[,s,e])=>a+(e-s+1),0);
-  if(filled < 20) monthsHtml += `<div class="gantt-month" style="grid-column:span ${20-filled}"></div>`;
+  // Si el proyecto no está parado, extender lastActive hasta hoy (inclusive)
+  if (!isParado && lastActive) {
+    const lastIdx = allSems.indexOf(lastActive);
+    const hoyIdx  = allSems.indexOf(hoy);
+    if (hoyIdx > lastIdx) lastActive = hoy;
+  }
+  const firstIdxAll = firstActive ? allSems.indexOf(firstActive) : -1;
+  const lastIdxAll  = lastActive  ? allSems.indexOf(lastActive)  : -1;
 
-  // Celdas
-  let cells = '';
-  const phases = Array.from({length:20},(_,i)=>tl[i]||null);
-  for(let i=0;i<20;i++){
-    const ph = phases[i];
-    const nextPh = phases[i+1];
-    const cls = ph ? `gantt-cell filled ${phaseCls(ph)}` : 'gantt-cell';
-    const noteKey = `cn:${slug}:${i}`;
-    const hasNote = !!(state.notes && state.notes[noteKey]);
-    const arrow = ph && nextPh && phaseCls(ph) !== phaseCls(nextPh) ? '<span class="gantt-arrow"></span>' : '';
-    const lbl = ph ? `<span class="gantt-label">${phaseShort(ph)}</span>` : '';
-    const noteClass = hasNote ? ' has-note' : '';
-    cells += ph
-      ? `<div class="${cls}${noteClass}" title="${ph} · sem ${WEEK_LABELS[i]}" data-slug="${slug}" data-week="${i}" data-phase="${ph}" data-person="${personId}" data-notekey="${noteKey}">${lbl}${arrow}</div>`
-      : `<div class="${cls}" title="Sem ${WEEK_LABELS[i]}"></div>`;
+  let weeksHtml = '<div class="gantt-weeks">';
+  ventana.forEach(sem => {
+    const isHoy = sem === hoy;
+    weeksHtml += `<div class="gantt-week${isHoy?' gantt-week-hoy':''}" style="font-size:9px;">${sem}</div>`;
+  });
+  weeksHtml += '</div>';
+
+  // Construir mapa semana→fase para forward-fill dentro de app.js
+  // (el forward-fill entre semanas con registros ya viene de generate_app.py;
+  //  aquí solo cubrimos la extensión desde lastActive hasta hoy)
+  const textoMap = {};
+  let lastKnownTexto = '';
+  allSems.forEach(sem => {
+    const entry = timeline.find(t => t.semana === sem);
+    const t = entry?.actividades?.[0]?.texto || '';
+    if (t) lastKnownTexto = t;
+    textoMap[sem] = t;
+  });
+
+  let cellsHtml = '<div class="gantt-grid">';
+  ventana.forEach(sem => {
+    const semIdx = allSems.indexOf(sem);
+    const inRange = firstIdxAll >= 0 && lastIdxAll >= 0
+                    && semIdx >= firstIdxAll && semIdx <= lastIdxAll;
+    const registrado = textoMap[sem] || '';
+    // Para semanas vacías dentro del rango activo (incluida la extensión a hoy):
+    // usar la última fase conocida del proyecto (forward-fill), no ph-pending
+    let texto = registrado;
+    let isFilled = false;
+    if (!texto && !isParado && inRange) {
+      // Encontrar la última fase registrada hasta esta semana
+      let fill = '';
+      for (let i = firstIdxAll; i <= semIdx; i++) {
+        const s = allSems[i];
+        if (textoMap[s]) fill = textoMap[s];
+      }
+      if (fill) { texto = fill; isFilled = true; }
+    }
+    const ph  = texto ? faseColor(texto) : '';
+    const isParadaCell = !registrado && isParado && inRange;
+    const cls = `gantt-cell${ph?' '+ph+' filled':''}${isFilled?' ph-continuidad':''}${isParadaCell?' ph9 filled':''}${sem===hoy?' gantt-cell-hoy':''}`;
+    const title = `${sem}${registrado?': '+registrado:isFilled?': '+texto+' (continuidad de fase)':isParadaCell?' (proyecto parado)':''}`;
+    const label = registrado ? abrev(registrado) : isParadaCell ? '···' : isFilled ? abrev(texto) : '';
+    cellsHtml += `<div class="${cls}" title="${title}">${label?`<span class="gantt-label">${label}</span>`:''}</div>`;
+  });
+  cellsHtml += '</div>';
+
+  return `<div class="gantt" style="overflow-x:auto;">${weeksHtml}${cellsHtml}</div>`;
+}
+
+/* ── Gantt completo (en el modal) ────────────────────────── */
+
+/* Parsea etiquetas de fecha del Master como "30 oct'26", "Dic'26", "Ene'27", "TBD", "—"
+   Devuelve un Date o null. */
+function _parseFechaProyecto(str) {
+  if (!str || str === '—' || str.toLowerCase() === 'tbd') return null;
+  const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+  // "30 oct'26" → día 30, oct, 2026
+  let m = str.match(/(\d{1,2})\s+([a-záéíóú]{3})'(\d{2})/i);
+  if (m) {
+    const mes = MESES[m[2].toLowerCase()];
+    if (mes !== undefined) return new Date(2000 + parseInt(m[3]), mes, parseInt(m[1]));
+  }
+  // "Dic'26" → día 1, dic, 2026
+  m = str.match(/([a-záéíóú]{3})'(\d{2})/i);
+  if (m) {
+    const mes = MESES[m[1].toLowerCase()];
+    if (mes !== undefined) return new Date(2000 + parseInt(m[2]), mes, 1);
+  }
+  return null;
+}
+
+/* Parsea un label de semana como "5 OCT", "28 DIC", "3 ENE" → Date (lunes de esa semana, año actual/siguiente) */
+function _parseSemLabel(label) {
+  const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+  const m = label.match(/(\d{1,2})\s+([a-záéíóú]{2,3})/i);
+  if (!m) return null;
+  const mes = MESES[m[2].toLowerCase()];
+  if (mes === undefined) return null;
+  const hoyYear = new Date().getFullYear();
+  // Si el mes ya pasó respecto a hoy, probablemente es el año siguiente
+  const d1 = new Date(hoyYear, mes, parseInt(m[1]));
+  const d2 = new Date(hoyYear + 1, mes, parseInt(m[1]));
+  // Usar el año más cercano a la fecha actual que sea >= 3 meses antes de hoy
+  const refDate = new Date(); refDate.setMonth(refDate.getMonth() - 3);
+  return d1 >= refDate ? d1 : d2;
+}
+
+/* Genera labels de semanas adicionales a partir de la última semana conocida hasta targetDate */
+function _extraWeekLabels(lastLabel, targetDate) {
+  const MNAMES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  let cur = _parseSemLabel(lastLabel);
+  if (!cur) return [];
+  const extra = [];
+  cur = new Date(cur.getTime() + 7 * 24 * 3600 * 1000); // siguiente semana
+  let safety = 0;
+  while (cur <= targetDate && safety < 52) {
+    extra.push(`${cur.getDate()} ${MNAMES[cur.getMonth()]}`);
+    cur = new Date(cur.getTime() + 7 * 24 * 3600 * 1000);
+    safety++;
+  }
+  return extra;
+}
+
+function ganttCompleto(proj) {
+  const baseSems = PLANNING_DATA?.semanas || [];
+  const hoy      = hoySemana();
+  if (!baseSems.length) return '<p style="color:var(--ink3);font-size:12px;">Sin datos de planning.</p>';
+
+  // Calcular horizonte: max(fin_obra, montaje) del proyecto
+  const dFinObra  = _parseFechaProyecto(proj.fin_obra  || '');
+  const dMontaje  = _parseFechaProyecto(proj.montaje   || '');
+  let targetDate = null;
+  if (dFinObra && dMontaje) targetDate = dFinObra > dMontaje ? dFinObra : dMontaje;
+  else targetDate = dFinObra || dMontaje;
+
+  // Último label del planning base
+  const lastBaseSem = baseSems[baseSems.length - 1];
+  const dLastBase   = _parseSemLabel(lastBaseSem);
+
+  // Añadir semanas sintéticas si targetDate supera el último label base
+  // Añadimos un margen de +6 días para incluir la semana que contiene targetDate
+  let sems = [...baseSems];
+  if (targetDate && dLastBase) {
+    const targetPlusPadding = new Date(targetDate.getTime() + 6 * 24 * 3600 * 1000);
+    if (targetPlusPadding > dLastBase) {
+      const extra = _extraWeekLabels(lastBaseSem, targetPlusPadding);
+      sems = [...sems, ...extra];
+    }
   }
 
-  // Weeks
-  const weeksHtml = WEEK_LABELS.map(w=>`<div class="gantt-week">${w}</div>`).join('');
-  const todayPct = (TODAY_WEEK / 20 * 100).toFixed(2);
+  const N    = sems.length;
+  const colW = `repeat(${N},minmax(28px,1fr))`;
+  const minW = `${N * 30}px`; // para forzar scroll horizontal
 
-  return `<div class="gantt">
-    <div class="gantt-months" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-bottom:3px;">${monthsHtml}</div>
-    <div class="gantt-row">
-      <div class="gantt-today" style="left:${todayPct}%"></div>
-      <div class="gantt-today-lbl" style="left:calc(${todayPct}% + 3px)">HOY</div>
-      <div class="gantt-grid">${cells}</div>
-    </div>
-    <div class="gantt-weeks" style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;margin-top:2px;">${weeksHtml}</div>
+  let weeksHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;margin-bottom:2px;min-width:${minW};">`;
+  sems.forEach(sem => {
+    const isHoy = sem === hoy;
+    const isSynt = !baseSems.includes(sem); // semana sintética (fuera del planning)
+    weeksHtml += `<div style="font-size:8.5px;font-weight:${isHoy?700:500};letter-spacing:.02em;
+      text-align:center;padding:3px 1px;
+      color:${isHoy?'var(--burg)':isSynt?'var(--ink3)':'var(--ink3)'};
+      opacity:${isSynt?0.55:1};
+      border-bottom:${isHoy?'2px solid var(--burg)':'1px solid transparent'};">${sem}</div>`;
+  });
+  weeksHtml += '</div>';
+
+  // Determinar si el proyecto está oficialmente parado
+  const estadoRaw = (proj.estado || proj._g?.fase_real || proj.fase || '').toUpperCase();
+  const isParado  = /PARAD|ESPERA|STANDBY|STOP|HOLD/.test(estadoRaw);
+
+  // Determinar rango activo del proyecto: primera y última semana con actividad registrada
+  const timeline   = proj._p?.timeline || [];
+  const activeSems = new Set(timeline.filter(t => t.actividades?.length).map(t => t.semana));
+  let firstActive  = null, lastActive = null;
+  sems.forEach(sem => {
+    if (activeSems.has(sem)) {
+      if (!firstActive) firstActive = sem;
+      lastActive = sem;
+    }
+  });
+  // Si no está parado, extender lastActive hasta hoy (la semana actual también es "activa")
+  if (!isParado && lastActive) {
+    const lastIdx_ = sems.indexOf(lastActive);
+    const hoyIdx_  = sems.indexOf(hoy);
+    if (hoyIdx_ >= 0 && hoyIdx_ > lastIdx_) lastActive = hoy;
+  }
+  const firstIdx = firstActive ? sems.indexOf(firstActive) : -1;
+  const lastIdx  = lastActive  ? sems.indexOf(lastActive)  : -1;
+
+  // Mapa semana→fase para forward-fill: celdas vacías heredan la última fase conocida
+  const textoMapC = {};
+  sems.forEach(sem => {
+    const entry = timeline.find(t => t.semana === sem);
+    textoMapC[sem] = entry?.actividades?.[0]?.texto || '';
+  });
+
+  let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;min-width:${minW};">`;
+  sems.forEach((sem, i) => {
+    const registrado = textoMapC[sem] || '';
+    const isSynt     = !baseSems.includes(sem);
+    const inActiveRange = firstIdx >= 0 && lastIdx >= 0 && i >= firstIdx && i <= lastIdx;
+    // Forward-fill: semana vacía en rango activo hereda última fase conocida
+    let texto = registrado;
+    let isFilled = false;
+    if (!texto && !isParado && inActiveRange) {
+      let fill = '';
+      for (let k = firstIdx; k <= i; k++) {
+        if (textoMapC[sems[k]]) fill = textoMapC[sems[k]];
+      }
+      if (fill) { texto = fill; isFilled = true; }
+    }
+    const ph           = texto ? faseColor(texto) : '';
+    const isParadaCell = !registrado && isParado && inActiveRange;
+    const clsParts     = ['gantt-cell'];
+    if (ph)           clsParts.push(ph, 'filled');
+    if (isFilled)     clsParts.push('ph-continuidad');
+    if (isParadaCell) clsParts.push('ph9', 'filled');
+    if (sem === hoy)  clsParts.push('gantt-cell-hoy');
+    const cls     = clsParts.join(' ');
+    const bgStyle = isSynt && !texto && !isParadaCell ? 'background:rgba(0,0,0,.02);' : '';
+    const titleTxt = registrado    ? `: ${registrado}`
+                   : isFilled      ? `: ${texto} (continuidad de fase)`
+                   : isParadaCell  ? ' (proyecto parado)'
+                   : '';
+    const labelTxt = registrado || isFilled ? abrev(texto) : isParadaCell ? '···' : '';
+    cellsHtml += `<div class="${cls}" title="${sem}${titleTxt}"
+      style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;${bgStyle}">
+      ${labelTxt ? `<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${labelTxt}</span>` : ''}
+    </div>`;
+  });
+  cellsHtml += '</div>';
+
+  const note = targetDate && sems.length > baseSems.length
+    ? `<div style="font-size:9px;color:var(--ink3);margin-top:6px;opacity:.7;">
+        * Semanas extendidas hasta ${targetDate.toLocaleDateString('es-ES',{month:'short',year:'numeric'})}
+        (${dFinObra&&dMontaje?'max(fin obra, montaje)':dFinObra?'fin de obra previsto':'montaje previsto'})
+       </div>`
+    : '';
+
+  return `<div style="overflow-x:auto;padding-bottom:4px;">${weeksHtml}${cellsHtml}${note}</div>`;
+}
+
+function _planningLegend() {
+  const items = [
+    ['ph1','Proyecto/Diseño'],['ph2','Obra'],['ph3','Montaje'],['ph4','Entrega'],
+    ['ph5','Renders'],['ph6','Visita'],['ph7','Pedidos/Remates'],['ph9','Parada'],
+    ['ph-continuidad ph1','Continuidad de fase'],['ph-pending','Sin planificación definida'],
+  ];
+  return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
+    ${items.map(([cls,lbl]) =>
+      `<div style="display:flex;align-items:center;gap:5px;">
+         <div class="gantt-cell ${cls} filled" style="width:16px;height:12px;border-radius:2px;"></div>
+         <span style="font-size:9.5px;color:var(--ink3);">${lbl}</span>
+       </div>`
+    ).join('')}
   </div>`;
 }
 
-// ── MODAL NOTA DE CELDA ────────────────────────────────────────────────────
-function openCellModal(slug, weekIdx, phase, personId, noteKey){
-  const state = S._c[personId] || {check:{},notes:{}};
-  const existing = state.notes?.[noteKey] || '';
-  const weekLbl = WEEK_LABELS[weekIdx] || weekIdx;
+/* ── Tarjeta de proyecto ─────────────────────────────────── */
+function projCard(proj, opts={}) {
+  const g    = proj._g;
+  const [dCls, dTxt] = deptTag(proj.dpto);
+  const [rCls, rTxt] = riskTag(g?.atencion || proj.atencion);
+  const hito  = g?.proximo_hito || proj.hito || '';
+  const fecha = g?.fecha_hito   || proj.fecha || '';
+  const bloq  = g?.bloqueador   || proj.bloqueador || '';
+  const equipo = (proj.equipo||[]).filter(e => e && e.length > 1).join(' · ');
 
-  const bd = document.createElement('div');
-  bd.className = 'modal-bg'; bd.id = 'cell-modal-bg';
-  bd.innerHTML = `<div class="modal">
-    <div class="modal-head">
-      <div><div class="modal-title">${slug.replace(/_/g,' ').toUpperCase()} · ${weekLbl}</div><div class="modal-sub">${phase}</div></div>
-      <button class="modal-close" id="m-close">×</button>
-    </div>
-    <div class="modal-body"><textarea id="m-ta" placeholder="Comentario para esta semana…">${existing}</textarea></div>
-    <div class="modal-foot">
-      ${existing?'<button class="btn-danger left" id="m-del">Borrar</button>':''}
-      <button class="btn-ghost" id="m-cancel">Cancelar</button>
-      <button class="btn-cop" id="m-save">Guardar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(bd);
-  bd.addEventListener('click', e=>{ if(e.target===bd) closeCellModal(); });
-  document.getElementById('m-close').onclick = closeCellModal;
-  document.getElementById('m-cancel').onclick = closeCellModal;
-  document.getElementById('m-save').onclick = ()=>{
-    const v = document.getElementById('m-ta').value.trim();
-    S.setNote(personId, noteKey, v);
-    const cell = document.querySelector(`[data-notekey="${noteKey}"]`);
-    if(cell){ v ? cell.classList.add('has-note') : cell.classList.remove('has-note'); }
-    closeCellModal();
-  };
-  const delBtn = document.getElementById('m-del');
-  if(delBtn) delBtn.onclick = ()=>{
-    S.setNote(personId, noteKey, '');
-    const cell = document.querySelector(`[data-notekey="${noteKey}"]`);
-    if(cell) cell.classList.remove('has-note');
-    closeCellModal();
-  };
-  document.getElementById('m-ta').focus();
-}
-function closeCellModal(){ const el=document.getElementById('cell-modal-bg'); if(el) el.remove(); }
+  const hitoHtml = hito && hito !== '—'
+    ? `<div class="hito-row"><span class="hito-text">${hito}</span>${fecha&&fecha!=='—'?`<span class="hito-date">${fecha}</span>`:''}</div>`
+    : '';
+  const bloqHtml = bloq && bloq !== '—'
+    ? `<div style="font-size:11.5px;color:var(--crit);margin:4px 0 2px;">⚠ ${bloq}</div>`
+    : '';
+  const equipoHtml = equipo
+    ? `<div style="font-size:11px;color:var(--ink3);margin-top:5px;">${equipo}</div>`
+    : '';
+  const hasTimeline = (proj._p?.timeline?.length || 0) > 0;
+  const ganttHtml = (opts.gantt !== false && hasTimeline) ? ganttGeneral(proj) : '';
 
-// ── COMPONENTES ──────────────────────────────────────────────────────────────
-function tagDept(d){
-  const cls=deptCls(d), lbl=d||'Todos';
-  return `<span class="tag ${cls}"><span class="dot"></span>${lbl}</span>`;
-}
-function tagRisk(r){
-  return `<span class="tag ${riskCls(r)}"><span class="dot"></span>${riskLbl(r)}</span>`;
-}
-function alertRow(a){
-  return `<div style="display:flex;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:6px;align-items:flex-start;">
-    <span style="flex-shrink:0;margin-top:2px;">${tagRisk(a.risk)}</span>
-    <div style="flex:1;min-width:0;">
-      <span style="font-weight:600;font-size:13px;">${a.proj}</span>
-      <span style="font-size:11px;color:var(--ink3);margin-left:6px;">${a.dept} · ${a.resp}</span>
-      <div style="font-size:13px;color:var(--ink2);margin-top:2px;">${a.text}</div>
-    </div>
-    <div style="font-size:11px;color:var(--ink3);white-space:nowrap;flex-shrink:0;padding-top:2px;">${a.fecha}</div>
-  </div>`;
-}
-
-function projCard(proj, personId){
-  const state = S._c[personId] || {check:{},notes:{}};
-  const slug = proj.slug || (proj.nombre||'').replace(/\s+/g,'_').toLowerCase();
-  const note = state.notes?.['note:'+slug] || '';
-  const hasTl = proj.tl && Object.keys(proj.tl).length > 0;
-  return `<div class="proj-card">
+  return `<div class="proj-card" data-id="${proj.id}">
     <div class="proj-top">
-      <div class="proj-name">${proj.nombre||proj.nombre}</div>
-      <div class="proj-tags">
-        ${proj.dept ? tagDept(proj.dept) : ''}
-        ${proj.riesgo||proj.intensidad ? tagRisk(proj.riesgo||proj.intensidad) : ''}
-        ${proj.estado ? `<span class="tag tag-out">${proj.estado}</span>` : ''}
+      <div style="flex:1;min-width:0;">
+        <div class="proj-tags" style="margin-bottom:5px;">
+          ${tagHtml(dCls,dTxt)} ${tagHtml(rCls,rTxt)}
+          ${proj.fase&&proj.fase!=='—'?`<span class="tag tag-out" style="font-size:10px;">${proj.fase}</span>`:''}
+        </div>
+        <div class="proj-name" style="cursor:pointer;" data-open="${proj.id}">${proj.nombre}</div>
       </div>
+      <button class="btn-ver" data-open="${proj.id}">
+        VER PROYECTO →
+      </button>
     </div>
-    ${proj.hito ? `<div class="hito-row"><span class="hito-text">${proj.hito}</span></div>` : ''}
-    ${proj.obs ? `<div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">${proj.obs}</div>` : ''}
-    ${proj.resp ? `<div class="proj-meta"><span class="k">Equipo</span><span>${proj.resp}</span></div>` : ''}
-    ${hasTl ? renderGantt({...proj, slug}, personId) : ''}
-    <div class="note-area" style="margin-top:${hasTl?'10px':'8px'}">
-      <label>Nota del equipo</label>
-      <textarea data-note="${slug}" data-person="${personId}" placeholder="Añadir nota…">${note}</textarea>
-    </div>
+    ${hitoHtml}${bloqHtml}${equipoHtml}
+    ${ganttHtml}
   </div>`;
 }
 
-function focusItem(text, id, personId){
-  const state = S._c[personId] || {check:{},notes:{}};
-  const done = !!(state.check?.[id]);
-  return `<div class="focus-item${done?' done':''}">
-    <input type="checkbox" data-check="${id}" data-person="${personId}" ${done?'checked':''}>
-    <span class="focus-text">${text}</span>
-  </div>`;
-}
+/* ── Modal unificado: ficha completa + planning ──────────── */
+let _modalId = null;
 
-function challanSection(filterProjs){
-  const rows = filterProjs
-    ? CHALLAN.filter(c=> filterProjs.some(p=> c.proj.toUpperCase().includes(p.toUpperCase().slice(0,6)) || p.toUpperCase().includes(c.proj.toUpperCase().slice(0,6))))
-    : CHALLAN;
-  const others = filterProjs ? CHALLAN.filter(c=> !rows.includes(c)) : [];
+function openModal(id) {
+  const raw = (MASTER_DATA||[]).find(p => p.id === id);
+  if (!raw) return;
+  _modalId = id;
+  const proj = enrich(raw);
+  const g    = proj._g;
 
-  const tblRows = (list) => list.map(r=>`<tr>
-    <td>${tagRisk(r.riesgo)}</td>
-    <td><b>${r.proj}</b><br><span style="font-size:10.5px;color:var(--ink3);">${r.resp}</span></td>
-    <td><span class="tag tag-out">${r.fase}</span></td>
-    <td style="font-size:12px;">${r.estado}</td>
-    <td style="font-size:11px;white-space:nowrap;">${r.comprometida}</td>
-    <td style="font-size:11px;white-space:nowrap;${r.realista.startsWith('⚠')?'color:var(--alto);font-weight:500;':''}">${r.realista}</td>
-    <td style="font-size:12px;color:var(--ink2);">${r.next}</td>
-  </tr>`).join('');
-  const tbl = (list) => `<div class="tbl-wrap"><table class="tbl"><thead><tr>
-    <th>Prio</th><th>Proyecto</th><th>Fase</th><th>Estado</th><th>Comprometida</th><th>Realista</th><th>Próximo paso</th>
-  </tr></thead><tbody>${tblRows(list)}</tbody></table></div>`;
+  const equipoHtml = (proj.equipo||[]).filter(e => e && e.length > 1)
+    .map(e => `<span class="tag tag-out">${e}</span>`).join(' ');
 
-  return `<div class="panel">
-    <div class="panel-head"><span class="eyebrow">Renders — Challan</span><span class="panel-note">${CHALLAN.length} proyectos en cola</span></div>
-    <div style="margin-bottom:10px;padding:8px 12px;background:var(--alto-t);border-radius:var(--r);font-size:12px;color:var(--alto);font-weight:500;">${CHALLAN_VAC}</div>
-    ${filterProjs && rows.length ? `<div style="font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px;">Mis proyectos en Challan</div>` : ''}
-    ${(filterProjs && rows.length) ? tbl(rows) : tbl(CHALLAN)}
-    ${others.length ? `<details class="collapse" style="margin-top:8px;"><summary>Resto de la cola (${others.length} proyectos)</summary><div class="inner">${tbl(others)}</div></details>` : ''}
-    <div style="margin-top:10px;padding:12px 14px;background:var(--cop3);border-radius:var(--r);border:1px dashed var(--cop);">
-      <div style="font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--cop);margin-bottom:8px;">+ Solicitar render a Challan</div>
-      <div class="challan-form">
-        <div><label>Proyecto</label><input id="ch-proj" type="text" placeholder="Nombre del proyecto"></div>
-        <div><label>Fase</label><select id="ch-fase"><option>F1 — Volumetría y capturas</option><option>F2 — Materialidad y acabados</option><option>F3 — Render final</option></select></div>
-        <div><label>Documentación disponible</label><input id="ch-doc" type="text" placeholder="Planos, 3D, vistas marcadas…"></div>
-        <div><label>Fecha comprometida con cliente</label><input id="ch-fecha" type="text" placeholder="ej. 22 jun"></div>
-        <div><label>Notas adicionales</label><textarea id="ch-notas" rows="2" style="min-height:0;" placeholder="Contexto, prioridad, solapamientos…"></textarea></div>
-        <button class="btn-cop" id="ch-submit">Enviar solicitud al PM</button>
-        <div id="ch-msg" style="font-size:12px;color:var(--baj);display:none;">✅ Solicitud registrada — el PM la revisará y la añadirá a la cola</div>
+  // Sección DECO
+  const decoItems = [
+    ['Deco cerrada',     proj.deco_cerrada],
+    ['Ppto. aceptado',   proj.presupuesto_deco_aceptado],
+    ['Pedidos',          proj.pedidos_confirmados],
+  ].filter(([,v]) => v && v !== '—' && v !== 'None');
+
+  const decoHtml = decoItems.length ? `
+    <div class="modal-section">
+      <div class="modal-section-label" style="color:var(--viv-dk,#5a7a3a);">
+        ▸ DECO
       </div>
-    </div>
-    <details class="collapse" style="margin-top:8px;"><summary>Flujo Challan · F1 → F2 → F3</summary>
-      <div class="inner" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;">
-        ${CHALLAN_FLUJO.map(f=>`<div style="background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;">
-          <div style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cop);margin-bottom:4px;">${f.fase}</div>
-          <div style="font-size:12px;font-weight:500;margin-bottom:4px;">${f.titulo}</div>
-          <div style="font-size:11.5px;color:var(--ink3);line-height:1.5;">${f.desc}</div>
-        </div>`).join('')}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${decoItems.map(([k,v]) =>
+          `<span class="tag ${v==='SÍ'||v==='Sí'?'tag-baj':'tag-out'}">${k}: ${v}</span>`
+        ).join('')}
       </div>
-    </details>
-    <details class="collapse" style="margin-top:6px;"><summary>Reglas operativas Challan</summary>
-      <div class="inner">${CHALLAN_REGLAS.map((r,i)=>`<div style="font-size:12px;color:var(--ink2);padding:5px 0;border-bottom:1px solid var(--paper2);">${i+1}. ${r}</div>`).join('')}</div>
-    </details>
-  </div>`;
-}
+    </div>` : '';
 
-// ── VISTAS ────────────────────────────────────────────────────────────────────
-let curPerson = 'javi';
-let filterDept = 'todos', filterRisk = 'todos', filterSearch = '';
-
-function renderMaster(){
-  const state = S._c['javi'] || {check:{},notes:{}};
-  let h = '';
-
-  h += `<div class="view-head">
-    <div><div class="view-title">Javi · Master</div><div class="view-sub">${WEEK_LABEL}</div></div>
-    <div class="view-tags">${tagDept('Vivienda')}${tagDept('Hoteles')}${tagDept('Restaurantes')}</div>
-  </div>`;
-
-  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas de la semana</span><span class="panel-note">${ALERTAS.length} activas</span></div>${ALERTAS.map(alertRow).join('')}</div>`;
-
-  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Mi foco esta semana</span></div><div class="focus-list">${(FOCO_SEMANA.javi||[]).map((t,i)=>focusItem(t,`javi-f${i}`,'javi')).join('')}</div></div>`;
-
-  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Esta semana en el estudio</span></div>
-    <div class="agenda-box">${AGENDA.map(a=>`<div class="agenda-row"><span class="agenda-when">${a.when}</span><span>${a.text}</span></div>`).join('')}</div></div>`;
-
-  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Montajes confirmados — julio</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fechas</th><th>Proyecto</th><th>Equipo</th><th>Dpto</th></tr></thead><tbody>
-    ${MONTAJES.map(m=>`<tr><td style="font-size:11px;white-space:nowrap;">${m.fechas}</td><td><b>${m.proj}</b></td><td>${m.equipo}</td><td>${tagDept(m.dept)}</td></tr>`).join('')}
-    </tbody></table></div></div>`;
-
-  // Carga equipo
-  const cargaItems = PERSON_ORDER.filter(id=>id!=='ale').map(id=>{
-    const projs = PROJS_PERSONA[id]||[];
-    const isVac = (VAC[id]||'').includes('15–19 jun')||(VAC[id]||'').includes('15-19 jun');
-    return `<div class="carga-card${isVac?' vac':''}">
-      <div class="carga-name">${NOMBRE_PERSONA[id]}<span class="tag ${isVac?'tag-vac':'tag-out'}">${isVac?'Vacaciones':'Activo'}</span></div>
-      <div class="carga-projs">${projs.slice(0,5).join(' · ')}</div>
+  // Sección FECHAS
+  const fechasHtml = `
+    <div class="modal-section">
+      <div class="modal-section-label">▸ FECHAS IMPORTANTES</div>
+      <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+        ${row2Always('Fin de obra previsto', proj.fin_obra)}
+        ${row2Always('Montaje previsto',     proj.montaje)}
+        ${row2Always('Fin oficial',          proj.entrega || proj.fin_oficial)}
+        ${row2Always('Próximo hito',         g?.proximo_hito || proj.hito)}
+        ${row2Always('Fecha del hito',       g?.fecha_hito || proj.fecha)}
+      </table>
     </div>`;
-  }).join('');
-  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Carga del equipo</span></div><div class="carga-grid">${cargaItems}</div></div>`;
 
-  h += challanSection(null);
+  const html = `
+    <div class="modal-bg" id="modal-bg">
+      <div class="modal modal-ficha">
 
-  // Master table
-  h += `<div class="panel">
-    <div class="panel-head"><span class="eyebrow">Master global de proyectos</span><span class="panel-note">${MASTER.length} proyectos</span></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
-      <input type="text" id="m-search" placeholder="Buscar…" style="font-family:var(--f);font-size:12.5px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);min-width:160px;">
-      ${['todos','Vivienda','Hoteles','Restaurantes'].map(d=>`<button class="tag${d==='todos'?'':'-'+d.toLowerCase().slice(0,4)} tag fpill${filterDept===d?' active':''}" data-fdept="${d}" style="cursor:pointer;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:${filterDept===d?'var(--burg)':'var(--surface)'};color:${filterDept===d?'#fff':'var(--ink3)'};">${d}</button>`).join('')}
-      ${['todos','Crítico','Alto','Medio','Bajo'].map(r=>`<button class="fpill${filterRisk===r?' active':''}" data-frisk="${r}" style="cursor:pointer;font-size:10.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:${filterRisk===r?'var(--burg)':'var(--surface)'};color:${filterRisk===r?'#fff':'var(--ink3)'};">${r}</button>`).join('')}
-    </div>
-    <div id="master-tbl"></div>
-  </div>`;
+        <div class="modal-head">
+          <div style="flex:1;min-width:0;">
+            <div class="modal-title">${proj.nombre}</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+              ${tagHtml(...deptTag(proj.dpto))}
+              ${tagHtml(...riskTag(g?.atencion||proj.atencion))}
+              ${proj.fase&&proj.fase!=='—'?`<span class="tag tag-out" style="font-size:10px;">${proj.fase}</span>`:''}
+            </div>
+          </div>
+          <button class="modal-close" id="modal-close">×</button>
+        </div>
 
-  // Mis proyectos
-  const myProjs = MASTER.filter(p=> (PROJS_PERSONA.javi||[]).some(n=> p.nombre.toUpperCase().includes(n.toUpperCase().slice(0,8)) || n.toUpperCase().includes(p.nombre.toUpperCase().slice(0,8))));
-  h += `<div class="panel"><div class="panel-head"><span class="eyebrow">Mis proyectos</span></div>${myProjs.map(p=>projCard({...p,slug:p.nombre.replace(/\s+/g,'_').toLowerCase()},'javi')).join('')}</div>`;
+        <div class="modal-body" style="overflow-y:auto;flex:1;padding:0 24px 16px;display:grid;grid-template-columns:minmax(280px,2fr) minmax(320px,3fr);gap:0 24px;min-height:0;">
 
-  return h;
+          <!-- COL IZQ -->
+          <div>
+            <!-- IDENTIDAD -->
+            <div class="modal-section">
+              <div class="modal-section-label">▸ IDENTIDAD</div>
+              <div style="margin-bottom:8px;">${equipoHtml || '<span style="color:var(--ink3);font-size:12px;">Sin equipo asignado</span>'}</div>
+              <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+                ${row2('Estado', proj.estado)}
+                ${row2('Constructora', proj.constructora)}
+                ${row2('Fase', proj.fase)}
+              </table>
+            </div>
+
+            <!-- ESTADO Y SEGUIMIENTO GLOBAL -->
+            <div class="modal-section">
+              <div class="modal-section-label">▸ SEGUIMIENTO GLOBAL</div>
+              ${(g?.bloqueador&&g.bloqueador!=='—')?`<div style="color:var(--crit);font-size:12.5px;font-weight:500;margin-bottom:8px;padding:6px 8px;background:rgba(180,30,30,.06);border-radius:4px;">⚠ ${g.bloqueador}</div>`:''}
+              <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+                ${row2('Próximo hito',  g?.proximo_hito || proj.hito)}
+                ${row2('Fecha hito',    g?.fecha_hito || proj.fecha)}
+                ${row2('Fase real',     g?.fase_real)}
+                ${row2('Acción',        g?.obs || proj.obs)}
+                ${row2('Cuándo',        g?.cuando)}
+              </table>
+            </div>
+
+            <!-- DECO -->
+            ${decoHtml}
+
+            <!-- FECHAS -->
+            ${fechasHtml}
+          </div>
+
+          <!-- COL DER: PLANNING COMPLETO -->
+          <div style="border-left:1px solid var(--line);padding-left:20px;">
+            <div class="modal-section" style="border-bottom:none;height:100%;">
+              <div class="modal-section-label">▸ PLANNING COMPLETO</div>
+              ${ganttCompleto(proj)}
+              ${_planningLegend()}
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-foot">
+          <button class="btn-ghost" id="modal-close2">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('modal-bg')?.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+
+  document.getElementById('modal-close')?.addEventListener('click',  closeModal);
+  document.getElementById('modal-close2')?.addEventListener('click', closeModal);
+  document.getElementById('modal-bg')?.addEventListener('click', e => {
+    if (e.target.id === 'modal-bg') closeModal();
+  });
 }
 
-function renderMasterTable(){
-  const q = filterSearch.toLowerCase();
-  const rows = MASTER.filter(p=>{
-    if(filterDept!=='todos'){
-      const d=DEPT_PERSONA; // rough dept from resp
-      const resp=(p.resp||'').toLowerCase();
-      if(filterDept==='Vivienda' && !['alicia','olatz','paula','sara','andrea','cristina','nela'].some(n=>resp.includes(n)) && !(p.nombre||'').toUpperCase().match(/PEDRAZA|ZAHARA|LAGOS 1|ALCALA|FLORIDA|HERMOSILLA|MONTESQUINZA|RINCONADA|ALDAMA|SANTANDER VIV|IBIZA|VALENCIA|PALOMA|TORRE|TEPEYAC|SUR [37]/)) {/* skip */}
-      // simplified: just use intensidad/riesgo filter
+function closeModal() {
+  document.getElementById('modal-bg')?.remove();
+  _modalId = null;
+}
+
+/* ── Agrupación de personas por departamento ─────────────── */
+const ORDEN_MANUAL = {
+  'HOTELES':      ['Marta','Naiara'],
+  'RESTAURANTES': ['Sofía','Sofia'],
+  'VIVIENDA':     ['Olatz','Andrea','Sara','Nela','Cristina','Paula'],
+  'SIN ASIGNAR':  []
+};
+
+function getPersonasByGroup() {
+  const personas = getPersonas();
+
+  function primaryDept(nombre) {
+    const counts = { HOTELES: 0, RESTAURANTES: 0, VIVIENDA: 0 };
+    (MASTER_DATA||[]).forEach(p => {
+      if (!(p.equipo||[]).includes(nombre)) return;
+      const d = (p.dpto||'').toUpperCase();
+      if (d.includes('HOTEL'))             counts.HOTELES++;
+      else if (d.includes('RESTAURANTE'))  counts.RESTAURANTES++;
+      else if (d.includes('VIVIENDA'))     counts.VIVIENDA++;
+    });
+    for (const dept of ['HOTELES','RESTAURANTES','VIVIENDA']) {
+      if (counts[dept] > 0 && counts[dept] === Math.max(...Object.values(counts))) return dept;
     }
-    if(filterRisk!=='todos'){
-      const rl=riskLbl(p.riesgo);
-      if(filterRisk==='Crítico' && !rl.includes('tico')) return false;
-      if(filterRisk==='Alto' && rl!=='Alto') return false;
-      if(filterRisk==='Medio' && rl!=='Medio') return false;
-      if(filterRisk==='Bajo' && rl!=='Bajo') return false;
-    }
-    if(q && !`${p.nombre} ${p.resp} ${p.estado} ${p.hito} ${p.obs}`.toLowerCase().includes(q)) return false;
-    return true;
+    if (counts.HOTELES > 0)      return 'HOTELES';
+    if (counts.RESTAURANTES > 0) return 'RESTAURANTES';
+    if (counts.VIVIENDA > 0)     return 'VIVIENDA';
+    return 'SIN ASIGNAR';
+  }
+
+  const DEPTS  = ['HOTELES','RESTAURANTES','VIVIENDA','SIN ASIGNAR'];
+  const groups = {};
+  DEPTS.forEach(d => { groups[d] = []; });
+  personas.forEach(n => { groups[primaryDept(n)].push(n); });
+
+  DEPTS.forEach(dept => {
+    const manual = (ORDEN_MANUAL[dept]||[]).filter(n => groups[dept].includes(n));
+    const resto  = groups[dept].filter(n => !manual.includes(n)).sort();
+    groups[dept] = [...manual, ...resto];
   });
 
-  const el=document.getElementById('master-tbl'); if(!el) return;
-  el.innerHTML=`<div class="tbl-wrap"><table class="tbl"><thead><tr>
-    <th>Proyecto</th><th>Responsable</th><th>Estado</th><th>Próximo hito</th><th>Riesgo</th><th>Observaciones</th>
-  </tr></thead><tbody>
-  ${rows.map(p=>`<tr>
-    <td><b>${p.nombre}</b></td>
-    <td style="font-size:12px;">${p.resp}</td>
-    <td>${p.estado}</td>
-    <td style="font-size:12px;">${p.hito}</td>
-    <td>${tagRisk(p.riesgo)}</td>
-    <td style="font-size:12px;color:var(--ink3);">${p.obs}</td>
-  </tr>`).join('')}
-  </tbody></table></div><div style="font-size:11px;color:var(--ink3);margin-top:6px;">${rows.length} de ${MASTER.length} proyectos</div>`;
+  return { groups, order: DEPTS };
 }
 
-function renderAle(){
-  let h='';
-  h+=`<div class="view-head">
-    <div><div class="view-title">Alejandra · CEO</div><div class="view-sub">${WEEK_LABEL} · Resumen ejecutivo</div></div>
-    <div class="view-tags"><span class="tag tag-vac"><span class="dot"></span>Vacaciones 15–19 jun</span></div>
-  </div>`;
+/* ── CSS de grupos de pestañas ───────────────────────────── */
+const GROUP_STYLES = {
+  'HOTELES':      { bg: 'var(--hot)',  label: 'HOTELES' },
+  'RESTAURANTES': { bg: 'var(--rest)', label: 'REST' },
+  'VIVIENDA':     { bg: 'var(--viv)',  label: 'VIV' },
+  'SIN ASIGNAR':  { bg: 'var(--cop)', label: '—' },
+};
 
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas — dónde puedes necesitar intervenir</span></div>${ALERTAS.map(alertRow).join('')}</div>`;
+/* ── Tabs ─────────────────────────────────────────────────── */
+// Orden: ALEJANDRA primero, JAVIER segundo, luego grupos por dept
+let curTab = 'alejandra';
 
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Esta semana en el estudio</span></div>
-    <div class="agenda-box">${AGENDA.map(a=>`<div class="agenda-row"><span class="agenda-when">${a.when}</span><span>${a.text}</span></div>`).join('')}</div></div>`;
+function buildTabs() {
+  const tabsEl = document.getElementById('tabs');
+  if (!tabsEl) return;
+  const { groups, order } = getPersonasByGroup();
 
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Tu presencia comprometida</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Compromiso</th></tr></thead><tbody>
-    ${PRESENCIA_ALE.map(p=>`<tr><td style="font-size:11px;white-space:nowrap;font-weight:500;color:var(--cop);">${p.fecha}</td><td>${p.texto}</td></tr>`).join('')}
-    </tbody></table></div></div>`;
+  let html = '';
 
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Próximas semanas — tener en cuenta</span></div>
-    ${PROXIMAS.map(s=>`<div class="prox-card">
-      <div class="prox-head">${s.sem}</div>
-      <div class="prox-body">${s.items.map(i=>`<div class="prox-item${i.startsWith('??')?' alert':i.includes('sin resolver')||i.includes('⚠')?' warn':''}">${i}</div>`).join('')}</div>
-    </div>`).join('')}
-  </div>`;
+  // Pestañas fijas: ALEJANDRA · DIRECCIÓN primero, JAVIER · CENTRO DE CONTROL segundo
+  html += `<button class="tab${curTab==='alejandra'?' active':''}" data-tab="alejandra"
+            style="font-weight:600;">ALEJANDRA · DIRECCIÓN</button>`;
+  html += `<button class="tab tab-master${curTab==='javi'?' active':''}" data-tab="javi"
+            style="font-weight:600;">JAVIER · CENTRO DE CONTROL</button>`;
 
-  h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Montajes confirmados — julio</span></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fechas</th><th>Proyecto</th><th>Equipo</th><th>Dpto</th></tr></thead><tbody>
-    ${MONTAJES.map(m=>`<tr><td style="font-size:11px;white-space:nowrap;">${m.fechas}</td><td><b>${m.proj}</b></td><td>${m.equipo}</td><td>${tagDept(m.dept)}</td></tr>`).join('')}
-    </tbody></table></div></div>`;
+  // Separador
+  html += `<div style="width:1px;background:var(--line);margin:4px 4px;align-self:stretch;opacity:.4;"></div>`;
 
-  h += challanSection(null);
-  return h;
-}
+  // Grupos por departamento (HOTELES, REST, VIV)
+  order.forEach(dept => {
+    const people = groups[dept];
+    if (!people.length) return;
+    const st = GROUP_STYLES[dept] || {};
 
-function renderPersonal(pid){
-  const state = S._c[pid] || {check:{},notes:{}};
-  const nombre = NOMBRE_PERSONA[pid]||pid;
-  const dept = DEPT_PERSONA[pid]||'';
-  const foco = FOCO_SEMANA[pid]||[];
-  const projNames = PROJS_PERSONA[pid]||[];
-  const isVac = (VAC[pid]||'').includes('15–19 jun');
+    html += `<div class="tab-group" style="
+      display:flex;align-items:center;gap:2px;
+      background:color-mix(in srgb,${st.bg} 18%,transparent);
+      border-radius:6px;padding:2px 6px;
+      border:1px solid color-mix(in srgb,${st.bg} 30%,transparent);">`;
 
-  let h='';
-  h+=`<div class="view-head">
-    <div><div class="view-title">${nombre}</div><div class="view-sub">${WEEK_LABEL}</div></div>
-    <div class="view-tags">${dept&&dept!=='todos'?tagDept(dept):''}${isVac?'<span class="tag tag-vac"><span class="dot"></span>Vacaciones</span>':''}</div>
-  </div>`;
-
-  if(foco.length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Foco esta semana</span></div>
-      <div class="focus-list">${foco.map((t,i)=>focusItem(t,`${pid}-f${i}`,pid)).join('')}</div></div>`;
-  }
-
-  // Alertas relevantes
-  const myAlerts = ALERTAS.filter(a=>{
-    const text=`${a.resp} ${a.proj} ${a.text}`.toLowerCase();
-    return text.includes(nombre.toLowerCase()) || projNames.some(p=>text.includes(p.toLowerCase().slice(0,6)));
+    people.forEach(nombre => {
+      const slug = nombre.toLowerCase().replace(/\s+/g,'_').replace(/[áa]/g,'a').replace(/[éeê]/g,'e');
+      const id   = `p__${slug}`;
+      html += `<button class="tab${curTab===id?' active':''}" data-tab="${id}"
+               style="white-space:nowrap;font-size:11px;">${nombre}</button>`;
+    });
+    html += `</div>`;
   });
-  if(myAlerts.length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Alertas relevantes</span></div>${myAlerts.map(alertRow).join('')}</div>`;
-  }
 
-  // Proyectos
-  const myProjs = MASTER.filter(p=> projNames.some(n=> p.nombre.toUpperCase().includes(n.toUpperCase().slice(0,8)) || n.toUpperCase().includes(p.nombre.toUpperCase().slice(0,8))));
-  if(myProjs.length){
-    h+=`<div class="panel"><div class="panel-head"><span class="eyebrow">Mis proyectos</span><span class="panel-note">${myProjs.length} activos</span></div>
-      ${myProjs.map(p=>projCard({...p,slug:p.nombre.replace(/\s+/g,'_').toLowerCase()},pid)).join('')}
+  tabsEl.innerHTML = html;
+}
+
+function activateTab(id) {
+  curTab = id;
+  document.querySelectorAll('#tabs .tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === id));
+
+  if      (id === 'alejandra') renderAlejandra();
+  else if (id === 'javi')      renderJavi();
+  else if (id.startsWith('p__')) {
+    const slug   = id.slice(3);
+    // Buscar la persona cuyo slug coincida
+    const nombre = getPersonas().find(n => {
+      const ns = n.toLowerCase().replace(/\s+/g,'_').replace(/[áa]/g,'a').replace(/[éeê]/g,'e');
+      return ns === slug;
+    });
+    if (nombre) renderPersona(nombre);
+  }
+}
+
+/* ── COLORES DE BLOQUES para índices ────────────────────────
+   Deben coincidir con los fondos de los paneles.
+   ──────────────────────────────────────────────────────────*/
+const BG_ALERTA    = 'rgba(180,30,30,.08)';
+const BG_ATENCION  = 'rgba(196,122,42,.07)';
+const BG_INFO      = 'rgba(80,80,140,.05)';
+const BG_CONTROLADO= 'rgba(0,0,0,.03)';
+const BG_SEMANA    = 'rgba(42,100,140,.06)';
+const BG_PROX      = 'rgba(42,120,80,.05)';
+const BG_OTROS     = 'rgba(0,0,0,.02)';
+
+const BORDE_ALERTA    = '#b41e1e';
+const BORDE_ATENCION  = '#c47a2a';
+const BORDE_INFO      = '#50508c';
+const BORDE_CONTROLADO= '#aaaaaa';
+const BORDE_SEMANA    = '#2a648c';
+const BORDE_PROX      = '#2a7850';
+const BORDE_OTROS     = '#cccccc';
+
+function indexBtn(id, label, bg, borde, count) {
+  if (!count) return '';
+  return `<a href="#${id}" class="idx-btn"
+    style="background:${bg};border:1px solid ${borde};color:${borde};">
+    ${label} <span style="font-weight:300;opacity:.7;">${count}</span>
+  </a>`;
+}
+
+/* ── Render Alejandra — DIRECCIÓN ─────────────────────────── */
+function renderAlejandra() {
+  const todos = (MASTER_DATA||[]).map(enrich);
+  const sem   = hoySemana();
+
+  const alerta   = todos.filter(p => atLevel(p) === 0);
+  const atencion = todos.filter(p => atLevel(p) === 1);
+
+  const estaSemanaAlert  = todos.filter(p => atLevel(p) <= 1 && projHasActivityThisWeek(p));
+  const estaSemanaNormal = todos.filter(p => atLevel(p) > 1  && projHasActivityThisWeek(p));
+  const estaSemana = [...estaSemanaAlert, ...estaSemanaNormal];
+
+  const proximamente = todos
+    .filter(p => projHasActivityInWindow(p, 1, 3))
+    .sort((a,b) => {
+      const da = a._g?.fecha_hito||'', db = b._g?.fecha_hito||'';
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+
+  // Índice
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${indexBtn('ale-alerta',    '● ALERTA',      BG_ALERTA,    BORDE_ALERTA,    alerta.length)}
+      ${indexBtn('ale-atencion',  '● ATENCIÓN',    BG_ATENCION,  BORDE_ATENCION,  atencion.length)}
+      ${indexBtn('ale-semana',    'ESTA SEMANA',   BG_SEMANA,    BORDE_SEMANA,    estaSemana.length)}
+      ${indexBtn('ale-prox',      'PRÓXIMAMENTE',  BG_PROX,      BORDE_PROX,      proximamente.length)}
+    </div>`;
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">DIRECCIÓN</div>
+      <div class="view-sub">${sem} · ${todos.length} proyectos</div>
+    </div>
+  </div>
+  ${indiceHtml}`;
+
+  html += `<div id="ale-alerta" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
+    <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}&ensp;<span style="font-weight:300;color:var(--ink3);">${alerta.length}</span></div>
+    ${alerta.length ? alerta.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
+  </div>`;
+
+  html += `<div id="ale-atencion" class="panel" style="background:${BG_ATENCION};border-left:3px solid ${BORDE_ATENCION};">
+    <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}&ensp;<span style="font-weight:300;color:var(--ink3);">${atencion.length}</span></div>
+    ${atencion.length ? atencion.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
+  </div>`;
+
+  if (estaSemana.length) {
+    html += `<div id="ale-semana" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span> <span style="font-size:11px;color:var(--ink3);font-weight:300;">${sem}</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Actividad</th><th>Próximo hito</th><th>Fecha</th></tr></thead>
+        <tbody>
+          ${estaSemana.map(p => {
+            const entry = (p._p?.timeline||[]).find(t => t.semana === sem);
+            const act   = (entry?.actividades||[]).map(a=>a.texto).join(', ') || '—';
+            return `<tr style="cursor:pointer;" data-open="${p.id}">
+              <td><strong>${p.nombre}</strong></td>
+              <td>${tagHtml(...deptTag(p.dpto))}</td>
+              <td style="color:var(--ink2);">${act}</td>
+              <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
+              <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
     </div>`;
   }
 
-  // Challan
-  h += challanSection(projNames);
-
-  return h;
-}
-
-// ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
-function render(){
-  // Tabs
-  const tabLabels = {'javi':'Javi · Master','ale':'Alejandra · CEO'};
-  document.getElementById('tabs').innerHTML = PERSON_ORDER.map(id=>{
-    const lbl = tabLabels[id] || NOMBRE_PERSONA[id];
-    const isMaster = id==='javi';
-    return `<button class="tab${id===curPerson?' active':''}${isMaster?' tab-master':''}" data-tab="${id}">${lbl}</button>`;
-  }).join('');
-
-  document.getElementById('week-badge').textContent = WEEK_STAMP;
-  document.getElementById('update-badge').textContent = UPDATED;
-
-  const view = document.getElementById('view');
-  if(curPerson==='javi'){
-    filterDept='todos'; filterRisk='todos'; filterSearch='';
-    view.innerHTML = renderMaster();
-    renderMasterTable();
-  } else if(curPerson==='ale'){
-    view.innerHTML = renderAle();
-  } else {
-    view.innerHTML = renderPersonal(curPerson);
+  if (proximamente.length) {
+    html += `<div id="ale-prox" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
+      <div class="panel-head"><span class="eyebrow">PRÓXIMAMENTE</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
+        <tbody>
+          ${proximamente.map(p => `<tr style="cursor:pointer;" data-open="${p.id}">
+            <td><strong>${p.nombre}</strong></td>
+            <td>${tagHtml(...deptTag(p.dpto))}</td>
+            <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
+            <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
   }
 
+  document.getElementById('view').innerHTML = html;
+}
+
+/* ── Render Javi — CENTRO DE CONTROL ──────────────────────── */
+function renderJavi() {
+  const todos = (MASTER_DATA||[]).map(enrich);
+  const sem   = hoySemana();
+
+  const GRUPOS = [
+    { level:0, id:'javi-alerta',     label:'● ALERTA',        cls:'tag-crit', bg:BG_ALERTA,     borde:BORDE_ALERTA,    withGantt:true  },
+    { level:1, id:'javi-atencion',   label:'● ATENCIÓN',      cls:'tag-alto', bg:BG_ATENCION,   borde:BORDE_ATENCION,  withGantt:true  },
+    { level:2, id:'javi-info',       label:'● INFO FALTANTE', cls:'tag-med',  bg:BG_INFO,       borde:BORDE_INFO,      withGantt:false },
+    { level:3, id:'javi-controlado', label:'● CONTROLADO',    cls:'tag-baj',  bg:BG_CONTROLADO, borde:BORDE_CONTROLADO,withGantt:false },
+  ];
+
+  GRUPOS.forEach(g => { g.projs = todos.filter(p => atLevel(p) === g.level); });
+
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${GRUPOS.map(g => indexBtn(g.id, g.label, g.bg, g.borde, g.projs.length)).join('')}
+    </div>`;
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">CENTRO DE CONTROL</div>
+      <div class="view-sub">${sem} · ${todos.length} proyectos</div>
+    </div>
+  </div>
+  ${indiceHtml}`;
+
+  GRUPOS.forEach(g => {
+    if (!g.projs.length) return;
+    html += `<div id="${g.id}" class="panel" style="background:${g.bg};border-left:3px solid ${g.borde};">
+      <div class="panel-head">
+        <span class="eyebrow">${tagHtml(g.cls, g.label)}&ensp;<span style="font-weight:300;color:var(--ink3);">${g.projs.length}</span></span>
+      </div>
+      ${g.projs.map(p => projCard(p, {gantt: g.withGantt})).join('')}
+    </div>`;
+  });
+
+  document.getElementById('view').innerHTML = html;
+}
+
+/* ── Render Persona ──────────────────────────────────────── */
+function renderPersona(nombre) {
+  const todos = (MASTER_DATA||[]).filter(p => (p.equipo||[]).includes(nombre)).map(enrich);
+  const sem   = hoySemana();
+
+  const prioridad      = todos.filter(p => atLevel(p) <= 1).sort((a,b) => atLevel(a)-atLevel(b));
+  const prioIds        = new Set(prioridad.map(p => p.id));
+  const estaSemana     = todos.filter(p => !prioIds.has(p.id) && projHasActivityThisWeek(p));
+  const estaIds        = new Set(estaSemana.map(p => p.id));
+  const otrosProyectos = todos.filter(p => !prioIds.has(p.id) && !estaIds.has(p.id));
+
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${indexBtn('sec-PRIORIDAD',       '● PRIORIDAD',       BG_ALERTA,   BORDE_ALERTA,   prioridad.length)}
+      ${indexBtn('sec-ESTA-SEMANA',     'ESTA SEMANA',       BG_SEMANA,   BORDE_SEMANA,   estaSemana.length)}
+      ${indexBtn('sec-OTROS-PROYECTOS', 'OTROS PROYECTOS',   BG_OTROS,    BORDE_OTROS,    otrosProyectos.length)}
+    </div>`;
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">${nombre}</div>
+      <div class="view-sub">${todos.length} proyecto${todos.length!==1?'s':''}</div>
+    </div>
+  </div>
+  ${indiceHtml}`;
+
+  if (prioridad.length) {
+    html += `<div id="sec-PRIORIDAD" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
+      <div class="panel-head">${tagHtml('tag-crit','● PRIORIDAD')}&ensp;<span style="font-weight:300;color:var(--ink3);">${prioridad.length}</span></div>
+      ${prioridad.map(p => projCard(p, {gantt:true})).join('')}
+    </div>`;
+  }
+
+  if (estaSemana.length) {
+    html += `<div id="sec-ESTA-SEMANA" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+      <div class="panel-head"><span class="eyebrow">ESTA SEMANA · ${sem}</span></div>
+      ${estaSemana.map(p => projCard(p, {gantt:true})).join('')}
+    </div>`;
+  }
+
+  if (otrosProyectos.length) {
+    html += `<div id="sec-OTROS-PROYECTOS" class="panel" style="background:${BG_OTROS};border-left:3px solid ${BORDE_OTROS};">
+      <div class="panel-head"><span class="eyebrow">OTROS PROYECTOS · ${otrosProyectos.length}</span></div>
+      ${otrosProyectos.map(p => projCard(p, {gantt:true})).join('')}
+    </div>`;
+  }
+
+  if (!todos.length) {
+    html += '<p class="panel-note" style="margin-top:20px;">Sin proyectos asignados.</p>';
+  }
+
+  document.getElementById('view').innerHTML = html;
+}
+
+/* ── Exportar ─────────────────────────────────────────────── */
+function exportar() {
+  const hoy  = new Date().toLocaleDateString('es-ES');
+  const sem  = hoySemana();
+  const lines = [`POMBO ESTUDIO — ${hoy} (${sem})`, '='.repeat(50), ''];
+
+  ['VIVIENDA','RESTAURANTES','HOTELES'].forEach(dpto => {
+    const ps = (MASTER_DATA||[]).filter(p => (p.dpto||'').toUpperCase().includes(dpto.slice(0,-1)||dpto));
+    if (!ps.length) return;
+    lines.push(`\n── ${dpto} (${ps.length}) ──`);
+    ps.forEach(p => {
+      const g = globalOf(p.id);
+      lines.push(`  ${p.nombre}`);
+      if (g?.atencion)     lines.push(`    ${g.atencion}`);
+      if (g?.proximo_hito) lines.push(`    → ${g.proximo_hito}${g.fecha_hito?' ('+g.fecha_hito+')':''}`);
+      if (g?.bloqueador)   lines.push(`    ⚠ ${g.bloqueador}`);
+    });
+  });
+
+  const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `pombo_${(sem||'export').replace('/','_')}.txt`;
+  a.click();
+}
+
+/* ── CSS dinámico ─────────────────────────────────────────── */
+function injectStyles() {
+  const css = `
+    /* Botón VER con fondo corporativo */
+    .btn-ver {
+      font-size:10.5px;font-weight:600;letter-spacing:.07em;
+      padding:5px 12px;white-space:nowrap;flex-shrink:0;
+      background:var(--burg,#4a2020);color:#fff;
+      border:none;border-radius:4px;cursor:pointer;
+      transition:opacity .15s;
+    }
+    .btn-ver:hover { opacity:.82; }
+
+    /* Índice de navegación */
+    .idx-nav {
+      display:flex;flex-wrap:wrap;gap:8px;
+    }
+    .idx-btn {
+      font-size:10.5px;font-weight:600;letter-spacing:.07em;
+      padding:5px 13px;border-radius:4px;text-decoration:none;
+      transition:opacity .15s;
+    }
+    .idx-btn:hover { opacity:.75; }
+
+    /* Paneles */
+    .panel { margin-bottom:16px;border-radius:6px;padding:14px 16px; }
+    .panel-note { font-size:12px;color:var(--ink3);padding:8px 0; }
+
+    /* Modal */
+    .modal-section { margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line); }
+    .modal-section:last-child { border-bottom:none; }
+    .modal-section-label {
+      font-size:9.5px;font-weight:700;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--ink3);margin-bottom:8px;
+    }
+
+    /* Tab groups */
+    .tab-group { display:inline-flex; }
+
+    /* Scroll en modal en pantallas pequeñas */
+    @media (max-width:780px) {
+      .modal > .modal-body { grid-template-columns:1fr !important; }
+      .modal > .modal-body > div:nth-child(2) { border-left:none !important; padding-left:0 !important; border-top:1px solid var(--line); padding-top:16px; }
+    }
+  `;
+  const el = document.createElement('style');
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
+/* ── Eventos ──────────────────────────────────────────────── */
+function wireEvents() {
+  document.getElementById('tabs')?.addEventListener('click', e => {
+    const b = e.target.closest('.tab');
+    if (b) activateTab(b.dataset.tab);
+  });
+
+  document.getElementById('view')?.addEventListener('click', e => {
+    const open = e.target.closest('[data-open]');
+    if (open) { openModal(open.dataset.open); return; }
+  });
+
+  document.getElementById('export-btn')?.addEventListener('click', exportar);
+  document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+}
+
+/* ── Init ─────────────────────────────────────────────────── */
+function init() {
+  injectStyles();
+  buildIndexes();
+  buildTabs();
   wireEvents();
+  activateTab('alejandra');  // Alejandra es la pestaña inicial
+
+  const wb = document.getElementById('week-badge');
+  if (wb) wb.textContent = hoySemana();
+
+  const ub = document.getElementById('update-badge');
+  if (ub && META?.updated) ub.textContent = 'Act. ' + META.updated;
 }
 
-function wireEvents(){
-  // Tabs
-  document.querySelectorAll('[data-tab]').forEach(el=>{
-    el.addEventListener('click', async ()=>{
-      curPerson = el.dataset.tab;
-      await S.load(curPerson);
-      render();
-    });
-  });
-  // Checkboxes
-  document.querySelectorAll('[data-check]').forEach(el=>{
-    el.addEventListener('change', ()=>{
-      S.setCheck(el.dataset.person, el.dataset.check, el.checked);
-      el.closest('.focus-item').classList.toggle('done', el.checked);
-    });
-  });
-  // Notas proyecto
-  document.querySelectorAll('[data-note]').forEach(el=>{
-    el.addEventListener('change', ()=>{ S.setNote(el.dataset.person, 'note:'+el.dataset.note, el.value); });
-  });
-  // Celdas Gantt
-  document.querySelectorAll('[data-notekey]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      openCellModal(el.dataset.slug, parseInt(el.dataset.week), el.dataset.phase, el.dataset.person, el.dataset.notekey);
-    });
-    const state = S._c[el.dataset.person] || {check:{},notes:{}};
-    if(state.notes?.[el.dataset.notekey]) el.classList.add('has-note');
-  });
-  // Filtros master
-  document.querySelectorAll('[data-fdept]').forEach(el=>{
-    el.addEventListener('click', ()=>{ filterDept=el.dataset.fdept; renderMasterTable(); });
-  });
-  document.querySelectorAll('[data-frisk]').forEach(el=>{
-    el.addEventListener('click', ()=>{ filterRisk=el.dataset.frisk; renderMasterTable(); });
-  });
-  const ms=document.getElementById('m-search');
-  if(ms) ms.addEventListener('input', ()=>{ filterSearch=ms.value; renderMasterTable(); });
-  // Challan request
-  const chBtn=document.getElementById('ch-submit');
-  if(chBtn) chBtn.addEventListener('click', ()=>{
-    const proj=document.getElementById('ch-proj')?.value?.trim();
-    if(!proj){ alert('Indica el nombre del proyecto'); return; }
-    const key=`challan-req:${Date.now()}`;
-    const data={proj, fase:document.getElementById('ch-fase')?.value, doc:document.getElementById('ch-doc')?.value, fecha:document.getElementById('ch-fecha')?.value, notas:document.getElementById('ch-notas')?.value, quien:NOMBRE_PERSONA[curPerson], cuando:new Date().toLocaleString('es-ES')};
-    S.setNote('javi', key, JSON.stringify(data));
-    document.getElementById('ch-msg').style.display='block';
-    ['ch-proj','ch-doc','ch-fecha','ch-notas'].forEach(id=>{ const el=document.getElementById(id); if(el)
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
