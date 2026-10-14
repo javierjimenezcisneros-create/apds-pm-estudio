@@ -150,9 +150,33 @@ function projHasActivityInWindow(proj, startOffset, endOffset) {
 
 /* ── Gantt tarjeta (ventana operativa compacta) ──────────── */
 function ganttGeneral(proj) {
-  const ventana = semanaWindow();
-  const hoy     = hoySemana();
+  const ventana  = semanaWindow();
+  const allSems  = PLANNING_DATA?.semanas || [];
+  const hoy      = hoySemana();
   if (!ventana.length) return '';
+
+  // Determinar si el proyecto está oficialmente parado
+  const estadoRaw = (proj.estado || proj._g?.fase_real || proj.fase || '').toUpperCase();
+  const isParado  = /PARAD|ESPERA|STANDBY|STOP|HOLD/.test(estadoRaw);
+
+  // Rango activo en TODO el planning (no solo en la ventana)
+  const timeline   = proj._p?.timeline || [];
+  const activeSems = new Set(timeline.filter(t => t.actividades?.length).map(t => t.semana));
+  let firstActive  = null, lastActive = null;
+  allSems.forEach(sem => {
+    if (activeSems.has(sem)) {
+      if (!firstActive) firstActive = sem;
+      lastActive = sem;
+    }
+  });
+  // Si el proyecto no está parado, extender lastActive hasta hoy (inclusive)
+  if (!isParado && lastActive) {
+    const lastIdx = allSems.indexOf(lastActive);
+    const hoyIdx  = allSems.indexOf(hoy);
+    if (hoyIdx > lastIdx) lastActive = hoy;
+  }
+  const firstIdxAll = firstActive ? allSems.indexOf(firstActive) : -1;
+  const lastIdxAll  = lastActive  ? allSems.indexOf(lastActive)  : -1;
 
   let weeksHtml = '<div class="gantt-weeks">';
   ventana.forEach(sem => {
@@ -163,11 +187,17 @@ function ganttGeneral(proj) {
 
   let cellsHtml = '<div class="gantt-grid">';
   ventana.forEach(sem => {
-    const entry = (proj._p?.timeline||[]).find(t => t.semana === sem);
+    const entry = timeline.find(t => t.semana === sem);
     const texto = entry?.actividades?.[0]?.texto || '';
     const ph    = texto ? faseColor(texto) : '';
-    const cls   = `gantt-cell${ph?' '+ph+' filled':''}${sem===hoy?' gantt-cell-hoy':''}`;
-    cellsHtml  += `<div class="${cls}" title="${sem}${texto?': '+texto:''}">${texto?`<span class="gantt-label">${abrev(texto)}</span>`:''}</div>`;
+    // Semana vacía dentro del rango activo → ph-pending (solo si no está parado)
+    const semIdx    = allSems.indexOf(sem);
+    const inRange   = firstIdxAll >= 0 && lastIdxAll >= 0
+                      && semIdx >= firstIdxAll && semIdx <= lastIdxAll;
+    const isPending = !texto && !isParado && inRange;
+    const cls = `gantt-cell${ph?' '+ph+' filled':''}${isPending?' ph-pending':''}${sem===hoy?' gantt-cell-hoy':''}`;
+    const title = `${sem}${texto?': '+texto:isPending?' (fase activa — sin registro semanal)':''}`;
+    cellsHtml += `<div class="${cls}" title="${title}">${texto?`<span class="gantt-label">${abrev(texto)}</span>`:''}</div>`;
   });
   cellsHtml += '</div>';
 
@@ -271,16 +301,55 @@ function ganttCompleto(proj) {
   });
   weeksHtml += '</div>';
 
-  let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;min-width:${minW};">`;
+  // Determinar si el proyecto está oficialmente parado
+  const estadoRaw = (proj.estado || proj._g?.fase_real || proj.fase || '').toUpperCase();
+  const isParado  = /PARAD|ESPERA|STANDBY|STOP|HOLD/.test(estadoRaw);
+
+  // Determinar rango activo del proyecto: primera y última semana con actividad registrada
+  const timeline   = proj._p?.timeline || [];
+  const activeSems = new Set(timeline.filter(t => t.actividades?.length).map(t => t.semana));
+  let firstActive  = null, lastActive = null;
   sems.forEach(sem => {
-    const entry = (proj._p?.timeline||[]).find(t => t.semana === sem);
-    const texto = entry?.actividades?.[0]?.texto || '';
-    const ph    = texto ? faseColor(texto) : '';
+    if (activeSems.has(sem)) {
+      if (!firstActive) firstActive = sem;
+      lastActive = sem;
+    }
+  });
+  // Si no está parado, extender lastActive hasta hoy (la semana actual también es "activa")
+  if (!isParado && lastActive) {
+    const lastIdx_ = sems.indexOf(lastActive);
+    const hoyIdx_  = sems.indexOf(hoy);
+    if (hoyIdx_ >= 0 && hoyIdx_ > lastIdx_) lastActive = hoy;
+  }
+  const firstIdx = firstActive ? sems.indexOf(firstActive) : -1;
+  const lastIdx  = lastActive  ? sems.indexOf(lastActive)  : -1;
+
+  let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;min-width:${minW};">`;
+  sems.forEach((sem, i) => {
+    const entry  = timeline.find(t => t.semana === sem);
+    const texto  = entry?.actividades?.[0]?.texto || '';
+    const ph     = texto ? faseColor(texto) : '';
     const isSynt = !baseSems.includes(sem);
-    const cls   = `gantt-cell${ph?' '+ph+' filled':''}${sem===hoy?' gantt-cell-hoy':''}`;
-    cellsHtml  += `<div class="${cls}" title="${sem}${texto?': '+texto:''}"
-      style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;${isSynt&&!texto?'background:rgba(0,0,0,.02);':''}"  >
-      ${texto?`<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${abrev(texto)}</span>`:''}
+    // Semana vacía dentro del período activo → pendiente de planificación (salvo parada oficial)
+    const inActiveRange = firstIdx >= 0 && lastIdx >= 0 && i >= firstIdx && i <= lastIdx;
+    const isPending     = !texto && !isParado && inActiveRange;
+    // Parada oficial y sin texto → marcar con ph9
+    const isParadaCell  = !texto && isParado && inActiveRange;
+    const clsParts = ['gantt-cell'];
+    if (ph)           clsParts.push(ph, 'filled');
+    if (isPending)    clsParts.push('ph-pending');
+    if (isParadaCell) clsParts.push('ph9', 'filled');
+    if (sem === hoy)  clsParts.push('gantt-cell-hoy');
+    const cls      = clsParts.join(' ');
+    const bgStyle  = isSynt && !texto && !isPending && !isParadaCell ? 'background:rgba(0,0,0,.02);' : '';
+    const titleTxt = texto          ? `: ${texto}`
+                   : isPending      ? ' (fase activa — sin registro semanal)'
+                   : isParadaCell   ? ' (proyecto parado)'
+                   : '';
+    cellsHtml += `<div class="${cls}" title="${sem}${titleTxt}"
+      style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;${bgStyle}">
+      ${texto          ? `<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${abrev(texto)}</span>` : ''}
+      ${isParadaCell   ? `<span class="gantt-label" style="font-size:8.5px;font-weight:600;">···</span>` : ''}
     </div>`;
   });
   cellsHtml += '</div>';
@@ -299,6 +368,7 @@ function _planningLegend() {
   const items = [
     ['ph1','Proyecto/Diseño'],['ph2','Obra'],['ph3','Montaje'],['ph4','Entrega'],
     ['ph5','Renders'],['ph6','Visita'],['ph7','Pedidos/Remates'],['ph9','Parada'],
+    ['ph-pending','Pendiente de planificación'],
   ];
   return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
     ${items.map(([cls,lbl]) =>
@@ -329,7 +399,8 @@ function projCard(proj, opts={}) {
   const equipoHtml = equipo
     ? `<div style="font-size:11px;color:var(--ink3);margin-top:5px;">${equipo}</div>`
     : '';
-  const ganttHtml = opts.gantt !== false ? ganttGeneral(proj) : '';
+  const hasTimeline = (proj._p?.timeline?.length || 0) > 0;
+  const ganttHtml = (opts.gantt !== false && hasTimeline) ? ganttGeneral(proj) : '';
 
   return `<div class="proj-card" data-id="${proj.id}">
     <div class="proj-top">
@@ -788,7 +859,7 @@ function renderPersona(nombre) {
   if (otrosProyectos.length) {
     html += `<div id="sec-OTROS-PROYECTOS" class="panel" style="background:${BG_OTROS};border-left:3px solid ${BORDE_OTROS};">
       <div class="panel-head"><span class="eyebrow">OTROS PROYECTOS · ${otrosProyectos.length}</span></div>
-      ${otrosProyectos.map(p => projCard(p, {gantt:false})).join('')}
+      ${otrosProyectos.map(p => projCard(p, {gantt:true})).join('')}
     </div>`;
   }
 

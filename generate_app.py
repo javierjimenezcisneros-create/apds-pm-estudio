@@ -4,7 +4,8 @@ APDS PM Estudio — Generador de app v3
 Lee PM_ESTUDIO_MASTER_COMPLETO.xlsx y genera docs/index.html
 Estructura nueva: MASTER GLOBAL + VIVIENDA/HOTELES/RESTAURANTES (Gantt sep-nov 2026)
 """
-import openpyxl, json, os
+import openpyxl, json, os, time as _time
+import datetime as _dt
 from datetime import date
 
 BASE  = os.path.dirname(os.path.abspath(__file__))
@@ -629,8 +630,14 @@ PLANNING_DATA = {
     'proyectos': planning_proyectos,
 }
 
+# Fecha de actualización = fecha de modificación del Excel maestro (no la de hoy)
+try:
+    _excel_fecha = _dt.date.fromtimestamp(_time.getmtime(EXCEL))
+except Exception:
+    _excel_fecha = hoy
+
 META = {
-    'updated':    hoy.strftime('%d %b %Y'),
+    'updated':    _excel_fecha.strftime('%d %b %Y'),
     'hoy_semana': HOY_SEMANA_LABEL,
 }
 
