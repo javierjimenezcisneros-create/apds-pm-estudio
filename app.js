@@ -185,19 +185,43 @@ function ganttGeneral(proj) {
   });
   weeksHtml += '</div>';
 
+  // Construir mapa semana→fase para forward-fill dentro de app.js
+  // (el forward-fill entre semanas con registros ya viene de generate_app.py;
+  //  aquí solo cubrimos la extensión desde lastActive hasta hoy)
+  const textoMap = {};
+  let lastKnownTexto = '';
+  allSems.forEach(sem => {
+    const entry = timeline.find(t => t.semana === sem);
+    const t = entry?.actividades?.[0]?.texto || '';
+    if (t) lastKnownTexto = t;
+    textoMap[sem] = t;
+  });
+
   let cellsHtml = '<div class="gantt-grid">';
   ventana.forEach(sem => {
-    const entry = timeline.find(t => t.semana === sem);
-    const texto = entry?.actividades?.[0]?.texto || '';
-    const ph    = texto ? faseColor(texto) : '';
-    // Semana vacía dentro del rango activo → ph-pending (solo si no está parado)
-    const semIdx    = allSems.indexOf(sem);
-    const inRange   = firstIdxAll >= 0 && lastIdxAll >= 0
-                      && semIdx >= firstIdxAll && semIdx <= lastIdxAll;
-    const isPending = !texto && !isParado && inRange;
-    const cls = `gantt-cell${ph?' '+ph+' filled':''}${isPending?' ph-pending':''}${sem===hoy?' gantt-cell-hoy':''}`;
-    const title = `${sem}${texto?': '+texto:isPending?' (fase activa — sin registro semanal)':''}`;
-    cellsHtml += `<div class="${cls}" title="${title}">${texto?`<span class="gantt-label">${abrev(texto)}</span>`:''}</div>`;
+    const semIdx = allSems.indexOf(sem);
+    const inRange = firstIdxAll >= 0 && lastIdxAll >= 0
+                    && semIdx >= firstIdxAll && semIdx <= lastIdxAll;
+    const registrado = textoMap[sem] || '';
+    // Para semanas vacías dentro del rango activo (incluida la extensión a hoy):
+    // usar la última fase conocida del proyecto (forward-fill), no ph-pending
+    let texto = registrado;
+    let isFilled = false;
+    if (!texto && !isParado && inRange) {
+      // Encontrar la última fase registrada hasta esta semana
+      let fill = '';
+      for (let i = firstIdxAll; i <= semIdx; i++) {
+        const s = allSems[i];
+        if (textoMap[s]) fill = textoMap[s];
+      }
+      if (fill) { texto = fill; isFilled = true; }
+    }
+    const ph  = texto ? faseColor(texto) : '';
+    const isParadaCell = !registrado && isParado && inRange;
+    const cls = `gantt-cell${ph?' '+ph+' filled':''}${isFilled?' ph-continuidad':''}${isParadaCell?' ph9 filled':''}${sem===hoy?' gantt-cell-hoy':''}`;
+    const title = `${sem}${registrado?': '+registrado:isFilled?': '+texto+' (continuidad de fase)':isParadaCell?' (proyecto parado)':''}`;
+    const label = registrado ? abrev(registrado) : isParadaCell ? '···' : isFilled ? abrev(texto) : '';
+    cellsHtml += `<div class="${cls}" title="${title}">${label?`<span class="gantt-label">${label}</span>`:''}</div>`;
   });
   cellsHtml += '</div>';
 
@@ -324,32 +348,45 @@ function ganttCompleto(proj) {
   const firstIdx = firstActive ? sems.indexOf(firstActive) : -1;
   const lastIdx  = lastActive  ? sems.indexOf(lastActive)  : -1;
 
+  // Mapa semana→fase para forward-fill: celdas vacías heredan la última fase conocida
+  const textoMapC = {};
+  sems.forEach(sem => {
+    const entry = timeline.find(t => t.semana === sem);
+    textoMapC[sem] = entry?.actividades?.[0]?.texto || '';
+  });
+
   let cellsHtml = `<div style="display:grid;grid-template-columns:${colW};gap:1px;min-width:${minW};">`;
   sems.forEach((sem, i) => {
-    const entry  = timeline.find(t => t.semana === sem);
-    const texto  = entry?.actividades?.[0]?.texto || '';
-    const ph     = texto ? faseColor(texto) : '';
-    const isSynt = !baseSems.includes(sem);
-    // Semana vacía dentro del período activo → pendiente de planificación (salvo parada oficial)
+    const registrado = textoMapC[sem] || '';
+    const isSynt     = !baseSems.includes(sem);
     const inActiveRange = firstIdx >= 0 && lastIdx >= 0 && i >= firstIdx && i <= lastIdx;
-    const isPending     = !texto && !isParado && inActiveRange;
-    // Parada oficial y sin texto → marcar con ph9
-    const isParadaCell  = !texto && isParado && inActiveRange;
-    const clsParts = ['gantt-cell'];
+    // Forward-fill: semana vacía en rango activo hereda última fase conocida
+    let texto = registrado;
+    let isFilled = false;
+    if (!texto && !isParado && inActiveRange) {
+      let fill = '';
+      for (let k = firstIdx; k <= i; k++) {
+        if (textoMapC[sems[k]]) fill = textoMapC[sems[k]];
+      }
+      if (fill) { texto = fill; isFilled = true; }
+    }
+    const ph           = texto ? faseColor(texto) : '';
+    const isParadaCell = !registrado && isParado && inActiveRange;
+    const clsParts     = ['gantt-cell'];
     if (ph)           clsParts.push(ph, 'filled');
-    if (isPending)    clsParts.push('ph-pending');
+    if (isFilled)     clsParts.push('ph-continuidad');
     if (isParadaCell) clsParts.push('ph9', 'filled');
     if (sem === hoy)  clsParts.push('gantt-cell-hoy');
-    const cls      = clsParts.join(' ');
-    const bgStyle  = isSynt && !texto && !isPending && !isParadaCell ? 'background:rgba(0,0,0,.02);' : '';
-    const titleTxt = texto          ? `: ${texto}`
-                   : isPending      ? ' (fase activa — sin registro semanal)'
-                   : isParadaCell   ? ' (proyecto parado)'
+    const cls     = clsParts.join(' ');
+    const bgStyle = isSynt && !texto && !isParadaCell ? 'background:rgba(0,0,0,.02);' : '';
+    const titleTxt = registrado    ? `: ${registrado}`
+                   : isFilled      ? `: ${texto} (continuidad de fase)`
+                   : isParadaCell  ? ' (proyecto parado)'
                    : '';
+    const labelTxt = registrado || isFilled ? abrev(texto) : isParadaCell ? '···' : '';
     cellsHtml += `<div class="${cls}" title="${sem}${titleTxt}"
       style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:3px;${bgStyle}">
-      ${texto          ? `<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${abrev(texto)}</span>` : ''}
-      ${isParadaCell   ? `<span class="gantt-label" style="font-size:8.5px;font-weight:600;">···</span>` : ''}
+      ${labelTxt ? `<span class="gantt-label" style="font-size:8.5px;font-weight:600;">${labelTxt}</span>` : ''}
     </div>`;
   });
   cellsHtml += '</div>';
@@ -368,7 +405,7 @@ function _planningLegend() {
   const items = [
     ['ph1','Proyecto/Diseño'],['ph2','Obra'],['ph3','Montaje'],['ph4','Entrega'],
     ['ph5','Renders'],['ph6','Visita'],['ph7','Pedidos/Remates'],['ph9','Parada'],
-    ['ph-pending','Pendiente de planificación'],
+    ['ph-continuidad ph1','Continuidad de fase'],['ph-pending','Sin planificación definida'],
   ];
   return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
     ${items.map(([cls,lbl]) =>

@@ -574,15 +574,38 @@ for p in _all_projects:
 # Los índices numéricos en _planning_raw.fases se convierten a etiquetas de semana.
 
 def fases_to_timeline(fases_dict, week_labels):
-    """Convierte {week_idx: label} → [{semana: week_label, actividades:[{texto:label}]}]"""
-    tl = []
+    """Convierte {week_idx: label} → [{semana: week_label, actividades:[{texto:label}]}]
+
+    Aplica forward-fill entre semanas con actividad registrada: una semana vacía
+    dentro del rango activo hereda la fase de la semana anterior conocida.
+    Esto evita huecos visuales injustificados entre bloques de la misma fase.
+    Las semanas anteriores a la primera actividad o posteriores a la última
+    NO se rellenan (quedan fuera del rango activo).
+    """
+    # Indexar las fases registradas por índice numérico
+    registradas = {}
     for idx, label in fases_dict.items():
         try:
             i = int(idx)
             if 0 <= i < len(week_labels):
-                tl.append({'semana': week_labels[i], 'actividades': [{'texto': str(label)}]})
+                registradas[i] = str(label)
         except (ValueError, TypeError):
             pass
+    if not registradas:
+        return []
+
+    first_idx = min(registradas)
+    last_idx  = max(registradas)
+
+    # Forward-fill: desde first_idx hasta last_idx, propagar la última fase conocida
+    tl = []
+    current_fase = None
+    for i in range(first_idx, last_idx + 1):
+        if i in registradas:
+            current_fase = registradas[i]
+        # current_fase es siempre no-None aquí (arrancamos con el primer registrado)
+        if current_fase:
+            tl.append({'semana': week_labels[i], 'actividades': [{'texto': current_fase}]})
     return tl
 
 planning_proyectos = []

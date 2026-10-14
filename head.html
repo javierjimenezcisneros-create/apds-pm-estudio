@@ -118,6 +118,10 @@ html,body{background:var(--paper);color:var(--ink);font-family:var(--f);font-siz
 .ph1{background:var(--ph1);} .ph2{background:var(--ph2);} .ph3{background:var(--ph3);}
 .ph4{background:var(--ph4);} .ph5{background:var(--ph5);} .ph6{background:var(--ph6);}
 .ph7{background:var(--ph7);} .ph8{background:var(--ph8);} .ph9{background:var(--ph9);}
+/* pendiente de planificación: rango activo sin actividad registrada NI fase inferible */
+.ph-pending{background:repeating-linear-gradient(135deg,var(--paper2) 0px,var(--paper2) 4px,rgba(180,170,160,.25) 4px,rgba(180,170,160,.25) 8px);border:1px dashed rgba(150,140,130,.4);}
+/* continuidad de fase: semana sin registro explícito, rellena con la última fase conocida */
+.ph-continuidad{opacity:.72;}
 
 /* ── PROJECT CARDS ── */
 .proj-card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:14px 16px;margin-bottom:10px;}
