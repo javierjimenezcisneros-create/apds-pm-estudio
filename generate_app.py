@@ -75,8 +75,8 @@ def extract_master():
             'constructora': str(row[7] or '—').strip(),
             'fase':    str(row[8] or '—').strip(),
             'atencion':str(row[9] or '—').strip(),
-            'nivel':   str(row[10] or '—').strip(),
-            'obs':     str(row[11] or '').strip() if len(row) > 11 else '',
+            'nivel':   str(row[9] or '—').strip(),   # col10=ATENCIÓN contiene ATENCIÓN MÁXIMA/ALTA
+            'obs':     str(row[13] or '').strip() if len(row) > 13 else '',  # col14=OBSERVACIONES
             'tl': {}
         })
     return projects
