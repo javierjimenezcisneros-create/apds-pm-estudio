@@ -4,11 +4,10 @@ on:
   push:
     paths:
       - 'PM_ESTUDIO_MASTER_COMPLETO.xlsx'
-      - 'Master_Global.xlsx'
-      - 'PLANNING_POMBO.xlsx'
       - 'app.js'
       - 'head.html'
       - 'generate_app.py'
+      # PLANNING_POMBO.xlsx eliminado — el Master incluye el Gantt hasta 11 ENE
   workflow_dispatch:  # permite lanzarlo manualmente desde GitHub
 
 jobs:
