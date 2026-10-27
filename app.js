@@ -587,9 +587,9 @@ function closeModal() {
 
 /* ── Agrupación de personas por departamento ─────────────── */
 const ORDEN_MANUAL = {
-  'HOTELES':      ['Marta','Naiara'],
-  'RESTAURANTES': ['Sofía','Sofia'],
-  'VIVIENDA':     ['Olatz','Andrea','Sara','Nela','Cristina','Paula'],
+  'HOTELES':      ['Marta','Jesús','Jesus'],
+  'RESTAURANTES': ['Sofía','Sofia','Naiara'],
+  'VIVIENDA':     ['Olatz','Sara','Andrea','Paula','Cristina','Nela'],
   'SIN ASIGNAR':  []
 };
 

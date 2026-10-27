@@ -42,8 +42,11 @@ def find_sheet(*keywords):
     return None
 
 # ── MASTER GLOBAL ─────────────────────────────────────────────────────────────
-# Cols: PROYECTO | DPTO | RESPONSABLE | ESTADO | HITO PRÓXIMO | FECHA |
-#       BLOQUEADOR | CONSTRUCTORA | FASE | ATENCIÓN | NIVEL | OBSERVACIONES
+# Cols Master(7+): PROYECTO | DPTO | EQUIPO | ESTADO | PRÓXIMO HITO | FECHA |
+#   BLOQUEADOR | CONSTRUCTORA | FASE | ATENCIÓN | FIN OBRA PREVISTO |
+#   MONTAJE PREVISTO | FINALIZACIÓN OFICIAL | DECO CERRADA |
+#   PRESUPUESTO DECO ACEPTADO | PEDIDOS CONFIRMADOS
+#   [opcionales idx16: ACCIÓN CONCRETA  idx17: CUÁNDO]
 def extract_master():
     sheet = find_sheet('MASTER','GLOBAL')
     if not sheet:
@@ -51,7 +54,7 @@ def extract_master():
         return []
     ws = wb[sheet]
     projects, header = [], False
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=12, values_only=True):
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=18, values_only=True):
         if not any(c for c in row): continue
         first = str(row[0] or '').strip()
         # Header row detection
@@ -75,8 +78,17 @@ def extract_master():
             'constructora': str(row[7] or '—').strip(),
             'fase':    str(row[8] or '—').strip(),
             'atencion':str(row[9] or '—').strip(),
-            'nivel':   str(row[10] or '—').strip(),
-            'obs':     str(row[11] or '').strip() if len(row) > 11 else '',
+            'nivel':   str(row[9] or '—').strip(),   # idx9=ATENCIÓN contiene ATENCIÓN MÁXIMA/ALTA
+            # Campos de obra — presentes desde Master v7
+            'fin_obra':    str(row[10] or '—').strip() if len(row) > 10 else '—',
+            'montaje':     str(row[11] or '—').strip() if len(row) > 11 else '—',
+            'entrega':     str(row[12] or '—').strip() if len(row) > 12 else '—',  # FINALIZACIÓN OFICIAL
+            'deco_cerrada':str(row[13] or '—').strip() if len(row) > 13 else '—',
+            'presupuesto_deco_aceptado': str(row[14] or '—').strip() if len(row) > 14 else '—',
+            'pedidos_confirmados':       str(row[15] or '—').strip() if len(row) > 15 else '—',
+            # Campos opcionales — presentes si se añaden cols idx16/idx17 al Excel
+            'obs':    str(row[16] or '').strip() if len(row) > 16 else '',  # ACCIÓN CONCRETA
+            'cuando': str(row[17] or '').strip() if len(row) > 17 else '',  # CUÁNDO
             'tl': {}
         })
     return projects
@@ -366,54 +378,20 @@ def make_id(nombre):
 for p in MASTER:
     p['id'] = make_id(p['nombre'])
 
-# ── LEER GLOBAL (Master_Global.xlsx en el repo) ────────────────────────────────
-# Cols: PROYECTO | RESPONSABLE | FASE REAL | ACTIVIDAD ACTUAL | FECHA OBJETIVO |
-#       FIN OBRA | MONTAJE | ENTREGA | DECO CERRADA | PRESU. DECO | PEDIDOS |
-#       SITUACIÓN/BLOQUEADOR | ACCIÓN CONCRETA | CUÁNDO
-GLOBAL_EXCEL = os.path.join(BASE, 'Master_Global.xlsx')
-_global_raw = {}
-if os.path.exists(GLOBAL_EXCEL):
-    wb_g = openpyxl.load_workbook(GLOBAL_EXCEL, data_only=True)
-    ws_g = wb_g[wb_g.sheetnames[0]]
-    rows_g = list(ws_g.iter_rows(min_row=1, max_row=ws_g.max_row, max_col=15, values_only=True))
-    header_g = False
-    for row in rows_g:
-        if str(row[0] or '').strip() == 'PROYECTO':
-            header_g = True; continue
-        if not header_g: continue
-        n = str(row[0] or '').strip()
-        if not n or len(n) < 3: continue
-        if n.startswith(('▸','🔴','🟠','🟡','  ')): continue
-        gid = make_id(n)
-        _global_raw[gid] = {
-            'id':                  gid,
-            'nombre_original':     n,
-            'fase_real':           str(row[2]  or '—').strip(),
-            'actividad_actual':    str(row[3]  or '—').strip(),
-            'atencion':            str(row[1]  or '').strip(),
-            'fecha_hito':          str(row[4]  or '—').strip(),
-            'fin_obra':            str(row[5]  or '—').strip(),
-            'montaje':             str(row[6]  or '—').strip(),
-            'entrega':             str(row[7]  or '—').strip(),
-            'deco_cerrada':        str(row[8]  or '—').strip(),
-            'presupuesto_deco_aceptado': str(row[9] or '—').strip(),
-            'pedidos_confirmados': str(row[10] or '—').strip(),
-            'bloqueador':          str(row[11] or '').strip(),
-            'accion_concreta':     str(row[12] or '').strip(),
-            'cuando':              str(row[13] or '').strip(),
-        }
-    print(f"Global (Master_Global.xlsx): {len(_global_raw)} proyectos")
-else:
-    print("⚠ Master_Global.xlsx no encontrado — GLOBAL vacío")
+# ── GLOBAL eliminado ──────────────────────────────────────────────────────────
+# Master_Global.xlsx ya NO se lee. Fuente única: PM_ESTUDIO_MASTER_COMPLETO.xlsx
+# (campos ACCIÓN CONCRETA y CUÁNDO vienen de las columnas 16 y 17 del Master)
+_global_raw = {}  # dict vacío — mantenido solo para no romper referencias residuales
 
-# ── LEER PLANNING (PLANNING_POMBO.xlsx en el repo) ────────────────────────────
-# Estructura: row1=estudio, row2=meses, row3=fechas, row4=cabecera, row5+=datos
-# Cols: DPTO | PROYECTO | RESPONSABLE | FASE | PRÓXIMO HITO | sem1 | sem2 | ...
+# ── LEER PLANNING (PLANNING_POMBO.xlsx) — DESACTIVADO ────────────────────────
+# El Master(7+) incluye pestañas VIVIENDA/HOTELES/RESTAURANTES con cobertura
+# hasta 11 ENE (15 semanas), superando las 14 semanas de PLANNING_POMBO.
+# Se mantiene el código pero desactivado; el Master es la única fuente de planning.
 PLANNING_EXCEL = os.path.join(BASE, 'PLANNING_POMBO.xlsx')
-_planning_raw  = {}   # id → {fases: {week_idx: label}}
-_planning_cols = {}   # col_idx → week_idx
+_planning_raw  = {}   # siempre vacío — Master es la fuente de planning
+_planning_cols = {}
 _week_labels_p = []
-if os.path.exists(PLANNING_EXCEL):
+if False and os.path.exists(PLANNING_EXCEL):  # desactivado intencionalmente
     wb_p = openpyxl.load_workbook(PLANNING_EXCEL, data_only=True)
     ws_p = wb_p[wb_p.sheetnames[0]]
     rows_p = list(ws_p.iter_rows(min_row=1, max_row=ws_p.max_row,
@@ -464,36 +442,10 @@ if os.path.exists(PLANNING_EXCEL):
 else:
     print("⚠ PLANNING_POMBO.xlsx no encontrado — usando PLANNING del master")
 
-# ── FUSIONAR LAS TRES FUENTES ──────────────────────────────────────────────────
-# Base: proyectos del MASTER (identidad + estado)
-# Completar con proyectos del GLOBAL que no estén en el MASTER
-# Completar con proyectos del PLANNING que no estén en ninguno de los dos
+# ── FUENTE ÚNICA: PM_ESTUDIO_MASTER_COMPLETO.xlsx ─────────────────────────────
+# El Master contiene todos los proyectos (69). No se fusiona con ninguna otra fuente.
 
 _master_index = {p['id']: p for p in MASTER}
-
-# Proyectos en GLOBAL pero no en MASTER → añadir stub desde GLOBAL
-for gid, g in _global_raw.items():
-    if gid not in _master_index:
-        # Derivar nombre legible desde la clave del global (el gid ya es limpio)
-        # Buscar el nombre original en _global_raw (necesitamos el nombre original)
-        # Lo recuperamos directamente del raw ya que g no tiene 'nombre' aún
-        # Re-leer del Excel no es viable aquí — usamos el id como proxy
-        _master_index[gid] = {
-            'id': gid,
-            'nombre': g.get('nombre_original', gid.replace('_',' ').upper()),
-            'dept':   '',
-            'resp':   '',
-            'estado': '',
-            'hito':   g.get('actividad_actual', '—'),
-            'fecha':  g.get('fecha_hito', '—'),
-            'bloqueador': g.get('bloqueador', ''),
-            'constructora': '—',
-            'fase':   g.get('fase_real', '—'),
-            'atencion': '',
-            'nivel':  '',
-            'obs':    g.get('accion_concreta', ''),
-            'tl': {},
-        }
 
 # Proyectos en PLANNING pero no en ninguno de los dos
 for pid, pr in _planning_raw.items():
@@ -524,7 +476,6 @@ _all_projects = list(MASTER) + [
 MASTER_DATA = []
 for p in _all_projects:
     pid = p['id']
-    g   = _global_raw.get(pid, {})
     MASTER_DATA.append({
         'id':           pid,
         'nombre':       p['nombre'],
@@ -541,32 +492,32 @@ for p in _all_projects:
         'atencion':     p['atencion'],
         'nivel':        p['nivel'],
         'obs':          p['obs'],
-        # Campos de GLOBAL que el modal accede en proj. directamente
-        'fin_obra':     g.get('fin_obra', '—'),
-        'montaje':      g.get('montaje', '—'),
-        'entrega':      g.get('entrega', '—'),
-        'deco_cerrada': g.get('deco_cerrada', '—'),
-        'presupuesto_deco_aceptado': g.get('presupuesto_deco_aceptado', '—'),
-        'pedidos_confirmados': g.get('pedidos_confirmados', '—'),
+        # Campos de obra — todos del Master (idx10–idx15)
+        'fin_obra':     p.get('fin_obra', '—'),
+        'montaje':      p.get('montaje',  '—'),
+        'entrega':      p.get('entrega',  '—'),
+        'deco_cerrada': p.get('deco_cerrada', '—'),
+        'presupuesto_deco_aceptado': p.get('presupuesto_deco_aceptado', '—'),
+        'pedidos_confirmados':       p.get('pedidos_confirmados', '—'),
     })
 
 # ── GLOBAL_DATA (campos que app.js accede vía _g = globalOf(id)) ──────────────
+# Todos los campos vienen del Master — no hay fallback a ninguna otra fuente.
 GLOBAL_DATA = []
 for p in _all_projects:
     pid = p['id']
-    g   = _global_raw.get(pid, {})
     GLOBAL_DATA.append({
         'id':              pid,
         'atencion':        p['atencion'],
-        'proximo_hito':    g.get('actividad_actual', p['hito']),
-        'fecha_hito':      g.get('fecha_hito', p['fecha']),
-        'bloqueador':      g.get('bloqueador', p['bloqueador']),
-        'obs':             g.get('accion_concreta', p['obs']),
-        'cuando':          g.get('cuando', ''),
-        'fase_real':       g.get('fase_real', p['fase']),
-        'fin_obra':        g.get('fin_obra', '—'),
-        'montaje':         g.get('montaje', '—'),
-        'entrega':         g.get('entrega', '—'),
+        'proximo_hito':    p['hito'],
+        'fecha_hito':      p['fecha'],
+        'bloqueador':      p['bloqueador'],
+        'obs':             p.get('obs', ''),
+        'cuando':          p.get('cuando', ''),
+        'fase_real':       p['fase'],
+        'fin_obra':        p.get('fin_obra', '—'),
+        'montaje':         p.get('montaje',  '—'),
+        'entrega':         p.get('entrega',  '—'),
     })
 
 # ── PLANNING_DATA ──────────────────────────────────────────────────────────────
