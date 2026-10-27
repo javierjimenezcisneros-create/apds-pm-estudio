@@ -15,13 +15,60 @@ OUT   = os.path.join(BASE, 'docs', 'index.html')
 wb = openpyxl.load_workbook(EXCEL, data_only=True)
 print("Hojas:", wb.sheetnames)
 
-# ── Semanas: 1 sep → 10 nov 2026 (11 semanas) ────────────────────────────────
+# ── Semanas: se construyen dinámicamente desde el Excel ──────────────────────
+# WEEK_LABELS y MONTHS se rellenan en extract_planning() al leer los Gantt.
+# TODAY_WEEK se recalcula después de leer las semanas reales.
 hoy = date.today()
-sem_inicio = date(2026, 9, 1)
-TODAY_WEEK = max(0, min((hoy - sem_inicio).days // 7, 10))
-WEEK_LABELS = ['1 SEP','8 SEP','15 SEP','22 SEP','29 SEP',
-               '6 OCT','13 OCT','20 OCT','27 OCT','3 NOV','10 NOV']
-MONTHS = [["SEP",0,4],["OCT",5,8],["NOV",9,10]]
+WEEK_LABELS = []   # se construye desde el Excel
+MONTHS      = []   # se construye desde el Excel
+TODAY_WEEK  = 0    # se recalcula tras leer WEEK_LABELS
+
+_MESES_NUM = {'ENE':1,'FEB':2,'MAR':3,'ABR':4,'MAY':5,'JUN':6,
+              'JUL':7,'AGO':8,'SEP':9,'OCT':10,'NOV':11,'DIC':12}
+
+def _parse_week_date(label: str):
+    """Convierte '12 OCT' → date(2026,10,12). Año inferido como 2026 ó 2027."""
+    parts = label.strip().split()
+    if len(parts) != 2:
+        return None
+    try:
+        day = int(parts[0])
+        mon = _MESES_NUM.get(parts[1].upper()[:3])
+        if not mon:
+            return None
+        # Año: si el mes ya pasó este año y el label es posterior al último conocido
+        # usamos año simple: 2026 para OCT-DIC, 2027 para ENE-AGO
+        year = 2027 if mon <= 8 else 2026
+        return date(year, mon, day)
+    except Exception:
+        return None
+
+def _rebuild_months(labels):
+    """Construye la lista MONTHS=[['MES',start_idx,end_idx],...] desde WEEK_LABELS."""
+    months = []
+    cur_mon = None
+    cur_start = 0
+    for i, lbl in enumerate(labels):
+        parts = lbl.strip().split()
+        mon = parts[1].upper()[:3] if len(parts) == 2 else None
+        if mon != cur_mon:
+            if cur_mon is not None:
+                months.append([cur_mon, cur_start, i - 1])
+            cur_mon = mon
+            cur_start = i
+    if cur_mon is not None:
+        months.append([cur_mon, cur_start, len(labels) - 1])
+    return months
+
+def _calc_today_week(labels):
+    """Devuelve el índice de la semana actual en labels."""
+    dated = [(i, _parse_week_date(l)) for i, l in enumerate(labels)]
+    dated = [(i, d) for i, d in dated if d]
+    if not dated:
+        return 0
+    # La semana actual es la última cuya fecha de inicio ≤ hoy
+    pasadas = [(i, d) for i, d in dated if d <= hoy]
+    return pasadas[-1][0] if pasadas else 0
 
 def find_sheet(*keywords):
     """Busca la primera hoja cuyo nombre contiene TODOS los keywords (si se pasan varios)
@@ -119,8 +166,12 @@ def extract_planning(sheet_name):
                 c_str = str(c or '').strip()
                 if c_str and any(ch.isdigit() for ch in c_str):
                     week_cols[j] = week_counter
-                    if week_counter >= len(WEEK_LABELS):
+                    if not WEEK_LABELS:
+                        # Primera hoja: construir WEEK_LABELS desde cero
                         WEEK_LABELS.append(c_str)
+                    elif week_counter >= len(WEEK_LABELS):
+                        WEEK_LABELS.append(c_str)
+                    # Si ya existe, verificar coherencia (no sobreescribir)
                     week_counter += 1
             break
         # Detectar fila de fechas (ej: '28 SEP', '5 OCT'...)
@@ -632,29 +683,18 @@ for p in MASTER:
         if tl:
             planning_proyectos.append({'id': p['id'], 'timeline': tl})
 
-# Recalcular TODAY_WEEK con las semanas del planning
-if _week_labels_p:
-    import datetime as _dt
-    def _parse_week(label):
-        parts = label.strip().split()
-        if len(parts) == 2:
-            meses = {'ENE':1,'FEB':2,'MAR':3,'ABR':4,'MAY':5,'JUN':6,
-                     'JUL':7,'AGO':8,'SEP':9,'OCT':10,'NOV':11,'DIC':12}
-            m = meses.get(parts[1].upper()[:3])
-            if m:
-                try: return _dt.date(2026, m, int(parts[0]))
-                except: pass
-        return None
-    fechas = [(_parse_week(l), i) for i, l in enumerate(_week_labels_p)]
-    fechas = [(f, i) for f, i in fechas if f]
-    if fechas:
-        hoy_date = _dt.date.today()
-        pasadas = [(f, i) for f, i in fechas if f <= hoy_date]
-        TODAY_WEEK = pasadas[-1][1] if pasadas else 0
+# Recalcular TODAY_WEEK y MONTHS desde las semanas reales leídas del Excel
+if WEEK_LABELS:
+    MONTHS      = _rebuild_months(WEEK_LABELS)
+    TODAY_WEEK  = _calc_today_week(WEEK_LABELS)
+    print(f"Semanas del planning: {len(WEEK_LABELS)} ({WEEK_LABELS[0]} → {WEEK_LABELS[-1]})")
+    print(f"Semana actual (TODAY_WEEK={TODAY_WEEK}): {WEEK_LABELS[TODAY_WEEK] if TODAY_WEEK < len(WEEK_LABELS) else 'n/a'}")
+else:
+    print("⚠ WEEK_LABELS vacío — no se encontraron semanas en el Excel")
 
 # hoy_semana debe ser el LABEL de la semana actual (string), no el índice numérico.
 # app.js hace sems.indexOf(hoySemana()) — necesita el mismo string que está en WEEK_LABELS.
-HOY_SEMANA_LABEL = WEEK_LABELS[TODAY_WEEK] if 0 <= TODAY_WEEK < len(WEEK_LABELS) else ''
+HOY_SEMANA_LABEL = WEEK_LABELS[TODAY_WEEK] if WEEK_LABELS and 0 <= TODAY_WEEK < len(WEEK_LABELS) else ''
 
 PLANNING_DATA = {
     'semanas':   WEEK_LABELS,
