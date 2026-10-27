@@ -90,7 +90,6 @@ MASTER_WEEKS = [
 # NOTA    : "Nela" está marcado como DUDOSO — confirmar nombre real en Bizneo.
 # Completar con apellidos cuando el equipo tenga homónimos.
 NAME_MAP = {
-    "Javi":     ["Javier", "Javi"],
     "Sofía":    ["Sofía", "Sofia"],
     "Naiara":   ["Naiara"],
     "Marta":    ["Marta"],
@@ -99,14 +98,18 @@ NAME_MAP = {
     "Paula":    ["Paula"],
     "Sara":     ["Sara"],
     "Andrea":   ["Andrea"],
-    "Nela":     ["Nela"],        # ⚠ PENDIENTE: confirmar nombre real en Bizneo
+    "Nela":     ["Nela", "María Cristina"],
     "Cristina": ["Cristina"],
     "Ana":      ["Ana"],
+    # Administración — se registran pero no generan alertas de proyectos
+    "Mauro":    ["Mauro"],
+    "Irene":    ["Irene"],
+    "Susana":   ["Susana"],
 }
 
 # Personal de administración: sus ausencias se registran pero no generan
-# alertas de cobertura de proyectos. Añadir nombres de pila aquí.
-ADMIN_NAMES: set[str] = set()   # Ej: {"Carmen", "Luis"}
+# alertas de cobertura de proyectos.
+ADMIN_NAMES: set[str] = {"Mauro", "Irene", "Susana"}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ESTRUCTURA DE LA HOJA AUSENCIAS
@@ -222,13 +225,20 @@ def calc_semanas(fi: date | None, ff: date | None) -> tuple[str, int]:
 def extract_name_type(summary: str) -> tuple[str, str]:
     """
     Extrae nombre_bizneo y tipo_ausencia del SUMMARY.
-    Formato esperado: "Nombre Apellido - Tipo ausencia" (el guion es separador).
+    Bizneo usa el formato: "TipoAusencia - NOMBRE APELLIDOS"
+    Ejemplo: "Vacaciones🏖️ - OLATZ MANDIOLA SOLOGAISTUA"
     """
     if not summary:
         return '', ''
     parts = re.split(r'\s*[-–—]\s*', summary.strip(), maxsplit=1)
-    nombre = parts[0].strip()
-    tipo   = parts[1].strip() if len(parts) > 1 else ''
+    if len(parts) == 2:
+        # Formato estándar Bizneo: tipo primero, nombre después
+        tipo   = parts[0].strip()
+        nombre = parts[1].strip()
+    else:
+        # Sin separador: el SUMMARY completo se trata como nombre, tipo desconocido
+        nombre = parts[0].strip()
+        tipo   = ''
     return nombre, tipo
 
 def match_pila(nombre_bizneo: str) -> str:
