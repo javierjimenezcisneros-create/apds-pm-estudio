@@ -239,6 +239,65 @@ if not ALE_ALERTAS:
 
 print(f"Resumen Alejandra: {len(ALE_ALERTAS)} alertas, {len(ALE_HITOS)} hitos")
 
+# ── AUSENCIAS BIZNEO ─────────────────────────────────────────────────────────
+AUSENCIAS_EQUIPO   = []   # todas las ausencias activas/futuras identificadas
+AUSENCIAS_ALERTAS  = []   # solo las que tienen impacto AVISO/ATENCIÓN/DECISIÓN
+BIZNEO_SYNC_TS     = None # timestamp de última sincronización
+
+aus_sheet = None
+for name in wb.sheetnames:
+    if 'AUSENCIAS' in name.upper():
+        aus_sheet = name
+        break
+
+if aus_sheet:
+    try:
+        ws_aus = wb[aus_sheet]
+        rows_aus = list(ws_aus.iter_rows(values_only=True))
+        if rows_aus:
+            headers_aus = [str(c or '').strip() for c in rows_aus[0]]
+            today_str = __import__('datetime').date.today().isoformat()
+            for row in rows_aus[1:]:
+                if not any(c for c in row):
+                    continue
+                d = dict(zip(headers_aus, row))
+                estado = str(d.get('ESTADO') or '').strip()
+                if estado in ('CANCELADA', 'ADMIN_IGNORAR', 'SIN_IDENTIFICAR'):
+                    continue
+                nombre_pila = str(d.get('NOMBRE_PILA') or '').strip()
+                if not nombre_pila or nombre_pila in ('SIN_IDENTIFICAR', 'ADMIN_IGNORAR'):
+                    continue
+                fecha_fin = d.get('FECHA_FIN')
+                if fecha_fin:
+                    fin_str = fecha_fin.date().isoformat() if hasattr(fecha_fin, 'date') else str(fecha_fin)[:10]
+                    if fin_str < today_str:
+                        continue
+                else:
+                    fin_str = ''
+                fecha_ini = d.get('FECHA_INICIO')
+                ini_str = fecha_ini.date().isoformat() if hasattr(fecha_ini, 'date') and fecha_ini else str(fecha_ini or '')[:10]
+                sync_ts = d.get('SYNC_FECHA')
+                if sync_ts and (BIZNEO_SYNC_TS is None or sync_ts > BIZNEO_SYNC_TS):
+                    BIZNEO_SYNC_TS = sync_ts
+                entrada = {
+                    'uid':        str(d.get('UID_ICAL') or ''),
+                    'persona':    nombre_pila,
+                    'tipo':       str(d.get('TIPO_AUSENCIA') or ''),
+                    'inicio':     ini_str,
+                    'fin':        fin_str,
+                    'semanas':    str(d.get('SEMANAS_AFECTADAS') or ''),
+                    'proyectos':  '',
+                    'estado':     estado,
+                }
+                AUSENCIAS_EQUIPO.append(entrada)
+        print(f"Ausencias Bizneo: {len(AUSENCIAS_EQUIPO)} activas/futuras")
+        if BIZNEO_SYNC_TS:
+            BIZNEO_SYNC_TS = BIZNEO_SYNC_TS.isoformat() if hasattr(BIZNEO_SYNC_TS, 'isoformat') else str(BIZNEO_SYNC_TS)
+    except Exception as e:
+        print(f"  ⚠ Error leyendo AUSENCIAS: {e}")
+else:
+    print("Hoja AUSENCIAS no encontrada — datos de ausencias no disponibles")
+
 # ── FOCO POR PERSONA ─────────────────────────────────────────────────────────
 NOMBRE_MAP = {
     'PM':'javi','Sofía':'sofia','Naiara':'naiara','Paula':'paula',
@@ -629,6 +688,9 @@ const ALE_HITOS = {json.dumps(ALE_HITOS, ensure_ascii=False)};
 const ALE_MONTAJES = {json.dumps(ALE_MONTAJES, ensure_ascii=False)};
 const ALE_PRESENCIA = {json.dumps(ALE_PRESENCIA, ensure_ascii=False)};
 const ALE_PROXIMAS = {json.dumps(ALE_PROXIMAS, ensure_ascii=False)};
+const AUSENCIAS_EQUIPO = {json.dumps(AUSENCIAS_EQUIPO, ensure_ascii=False)};
+const AUSENCIAS_ALERTAS = {json.dumps(AUSENCIAS_ALERTAS, ensure_ascii=False)};
+const BIZNEO_SYNC_TS = {json.dumps(BIZNEO_SYNC_TS, ensure_ascii=False)};
 const RENDERS = {json.dumps(RENDERS, ensure_ascii=False)};
 const RENDERS_FLUJO = {json.dumps(RENDERS_FLUJO, ensure_ascii=False)};
 const RENDERS_REGLAS = {json.dumps(RENDERS_REGLAS, ensure_ascii=False)};
