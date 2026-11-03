@@ -259,7 +259,7 @@ const ALE_PRESENCIA = [];
 const ALE_PROXIMAS = [];
 const AUSENCIAS_EQUIPO = [{"uid": "24305977", "persona": "Nela", "tipo": "Ausencia", "inicio": "2026-11-10", "fin": "2026-11-10", "semanas": "9 NOV", "proyectos": "", "estado": "CONFIRMADA"}, {"uid": "24432902", "persona": "Nela", "tipo": "Vacaciones🏖️", "inicio": "2026-12-21", "fin": "2026-12-23", "semanas": "21 DIC", "proyectos": "", "estado": "CONFIRMADA"}, {"uid": "24673609", "persona": "Ana", "tipo": "Ausencia", "inicio": "2026-11-19", "fin": "2026-11-19", "semanas": "16 NOV", "proyectos": "", "estado": "CONFIRMADA"}, {"uid": "24674162", "persona": "Naiara", "tipo": "Vacaciones🏖️", "inicio": "2026-12-09", "fin": "2026-12-11", "semanas": "7 DIC", "proyectos": "", "estado": "CONFIRMADA"}, {"uid": "24674183", "persona": "Naiara", "tipo": "Vacaciones🏖️", "inicio": "2026-12-23", "fin": "2027-01-07", "semanas": "21 DIC, 28 DIC, 4 ENE", "proyectos": "", "estado": "CONFIRMADA"}, {"uid": "24693127", "persona": "Mauro", "tipo": "Vacaciones🏖️", "inicio": "2026-11-27", "fin": "2026-11-27", "semanas": "23 NOV", "proyectos": "", "estado": "CONFIRMADA"}, {"uid": "23652108", "persona": "Sofía", "tipo": "Vacaciones🏖️", "inicio": "2026-11-13", "fin": "2026-11-24", "semanas": "9 NOV, 16 NOV, 23 NOV", "proyectos": "", "estado": "CONFIRMADA"}];
 const AUSENCIAS_ALERTAS = [];
-const BIZNEO_SYNC_TS = "2026-11-02T15:00:25";
+const BIZNEO_SYNC_TS = "2026-11-03T13:48:11";
 const RENDERS = [];
 const RENDERS_FLUJO = [{"fase": "F1", "titulo": "Volumetría y capturas", "desc": "Planos + 3D + vistas marcadas. ~1 semana desde doc completa."}, {"fase": "F2", "titulo": "Materialidad y acabados", "desc": "Toda la info de acabados y mobiliario. 2-3 días."}, {"fase": "F3", "titulo": "Render final", "desc": "TODAS las correcciones cerradas ANTES de renderizar."}];
 const RENDERS_REGLAS = ["Máx. 2-3 proyectos activos simultáneos por renderista.", "Nunca activar sin documentación 100% completa.", "PM es el filtro — nadie pasa trabajo sin visto bueno del PM."];
@@ -1005,147 +1005,121 @@ function indexBtn(id, label, bg, borde, count) {
 
 /* ── Render Alejandra — DIRECCIÓN ─────────────────────────── */
 function renderAlejandra() {
-  const todos = (MASTER_DATA||[]).map(enrich);
-  const sem   = hoySemana();
+  // Panel de Dirección: muestra EXCLUSIVAMENTE intervenciones escaladas por el PM.
+  // No muestra información operativa del equipo (alertas, Gantt, cargas, objetivos completos).
+  // Especificación v1.1 aprobada: secciones Decisiones urgentes, Próximas intervenciones,
+  // Reuniones con su presencia, Resueltas recientemente.
+  const sem = hoySemana();
 
-  const alerta   = todos.filter(p => atLevel(p) === 0);
-  const atencion = todos.filter(p => atLevel(p) === 1);
-
-  const estaSemanaAlert  = todos.filter(p => atLevel(p) <= 1 && projHasActivityThisWeek(p));
-  const estaSemanaNormal = todos.filter(p => atLevel(p) > 1  && projHasActivityThisWeek(p));
-  const estaSemana = [...estaSemanaAlert, ...estaSemanaNormal];
-
-  const proximamente = todos
-    .filter(p => projHasActivityInWindow(p, 1, 3))
-    .sort((a,b) => {
-      const da = a._g?.fecha_hito||'', db = b._g?.fecha_hito||'';
-      return da < db ? -1 : da > db ? 1 : 0;
-    });
-
-  // Índice
-  const indiceHtml = `
-    <div class="idx-nav" style="margin-bottom:20px;">
-      ${indexBtn('ale-alerta',    '● ALERTA',      BG_ALERTA,    BORDE_ALERTA,    alerta.length)}
-      ${indexBtn('ale-atencion',  '● ATENCIÓN',    BG_ATENCION,  BORDE_ATENCION,  atencion.length)}
-      ${indexBtn('ale-semana',    'ESTA SEMANA',   BG_SEMANA,    BORDE_SEMANA,    estaSemana.length)}
-      ${indexBtn('ale-prox',      'PRÓXIMAMENTE',  BG_PROX,      BORDE_PROX,      proximamente.length)}
-    </div>`;
-
-  let html = `<div class="view-head">
-    <div>
-      <div class="view-title">DIRECCIÓN</div>
-      <div class="view-sub">${sem} · ${todos.length} proyectos</div>
-    </div>
-  </div>
-  ${indiceHtml}`;
-
-  html += `<div id="ale-alerta" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
-    <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}&ensp;<span style="font-weight:300;color:var(--ink3);">${alerta.length}</span></div>
-    ${alerta.length ? alerta.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
-  </div>`;
-
-  html += `<div id="ale-atencion" class="panel" style="background:${BG_ATENCION};border-left:3px solid ${BORDE_ATENCION};">
-    <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}&ensp;<span style="font-weight:300;color:var(--ink3);">${atencion.length}</span></div>
-    ${atencion.length ? atencion.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
-  </div>`;
-
-  if (estaSemana.length) {
-    html += `<div id="ale-semana" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
-      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span> <span style="font-size:11px;color:var(--ink3);font-weight:300;">${sem}</span></div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Actividad</th><th>Próximo hito</th><th>Fecha</th></tr></thead>
-        <tbody>
-          ${estaSemana.map(p => {
-            const entry = (p._p?.timeline||[]).find(t => t.semana === sem);
-            const act   = (entry?.actividades||[]).map(a=>a.texto).join(', ') || '—';
-            return `<tr style="cursor:pointer;" data-open="${p.id}">
-              <td><strong>${p.nombre}</strong></td>
-              <td>${tagHtml(...deptTag(p.dpto))}</td>
-              <td style="color:var(--ink2);">${act}</td>
-              <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
-              <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
-  }
-
-  if (proximamente.length) {
-    html += `<div id="ale-prox" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
-      <div class="panel-head"><span class="eyebrow">PRÓXIMAMENTE</span></div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
-        <tbody>
-          ${proximamente.map(p => `<tr style="cursor:pointer;" data-open="${p.id}">
-            <td><strong>${p.nombre}</strong></td>
-            <td>${tagHtml(...deptTag(p.dpto))}</td>
-            <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
-            <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
-  }
-
-  /* ── Secciones de intervenciones de dirección ─────────────── */
   const int_d = (typeof INTERVENCIONES_DIR !== 'undefined') ? INTERVENCIONES_DIR : null;
   const intervenciones = (int_d && int_d.intervenciones) ? int_d.intervenciones : [];
-  const hoyD = new Date(); hoyD.setHours(0,0,0,0);
 
-  // Decisiones urgentes: fecha_limite ≤ 5 días y estado Pendiente/En revisión
+  // Decisiones urgentes: Pendiente/En revisión con fecha_limite ≤ 5 días
   const urgentes = intervenciones.filter(i => {
     if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
     const d = diasRestantes(i.fecha_limite);
     return d !== null && d <= 5;
   }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
 
-  // Próximas: 6–14 días
+  // Próximas intervenciones: 6–14 días
   const proximas = intervenciones.filter(i => {
     if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
     const d = diasRestantes(i.fecha_limite);
     return d !== null && d >= 6 && d <= 14;
   }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
 
-  // Resueltas recientemente: últimas 7 con decision_adoptada
+  // Reuniones con presencia de Alejandra
+  const reuniones = intervenciones.filter(i =>
+    i.tipo === 'Reunión' && i.estado !== 'Resuelta' && i.estado !== 'Descartada'
+  ).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
+
+  // Resueltas recientemente: últimas 7 con decision_adoptada (gravedad_pm nunca expuesto)
   const resueltas = intervenciones
     .filter(i => i.estado === 'Resuelta' && i.decision_adoptada)
     .sort((a,b) => (b.fecha_resolucion||'').localeCompare(a.fecha_resolucion||''))
     .slice(0, 7);
 
-  function intRow(i) {
+  const totalPendientes = urgentes.length + proximas.length;
+
+  // Índice de navegación
+  const indiceHtml = `
+    <div class="idx-nav" style="margin-bottom:20px;">
+      ${urgentes.length  ? indexBtn('ale-int-urgentes',  '● URGENTE',           BG_ALERTA,    BORDE_ALERTA,  urgentes.length)  : ''}
+      ${proximas.length  ? indexBtn('ale-int-proximas',  'PRÓXIMAS',            BG_PROX,      BORDE_PROX,    proximas.length)  : ''}
+      ${reuniones.length ? indexBtn('ale-int-reuniones', 'REUNIONES',           BG_SEMANA,    BORDE_SEMANA,  reuniones.length) : ''}
+      ${resueltas.length ? indexBtn('ale-int-resueltas', 'RESUELTAS',           'var(--bg2)', '#2a7a2a',     resueltas.length) : ''}
+    </div>`;
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">DIRECCIÓN</div>
+      <div class="view-sub">${sem}${totalPendientes ? ` · ${totalPendientes} intervención${totalPendientes!==1?'es':''} pendiente${totalPendientes!==1?'s':''}` : ' · sin intervenciones pendientes'}</div>
+    </div>
+  </div>
+  ${indiceHtml}`;
+
+  // Helper fila de intervención para Alejandra (sin gravedad_pm)
+  function intRowAle(i) {
     const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
     const dias = diasRestantes(i.fecha_limite);
-    const diasStr = dias === null ? '—' : dias < 0 ? `<span style="color:#c00;font-weight:600;">vencida</span>` : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>` : `${dias}d`;
+    const diasStr = dias === null ? '—'
+      : dias < 0 ? `<span style="color:#c00;font-weight:600;">vencida +${Math.abs(dias)}d</span>`
+      : dias === 0 ? `<span style="color:#c00;font-weight:600;">hoy</span>`
+      : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>`
+      : `${dias}d`;
+    // Opciones si es Decisión o Aprobación
+    const opcionesHtml = (i.opciones && i.opciones.length && (i.tipo === 'Decisión' || i.tipo === 'Aprobación'))
+      ? `<div style="margin-top:4px;font-size:10.5px;color:var(--ink3);">${i.opciones.map(o=>`<span style="margin-right:10px;">▸ <strong>${o.label}</strong>: ${o.consecuencia}</span>`).join('')}</div>`
+      : '';
     return `<tr style="border-top:1px solid var(--rule);">
-      <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;">${i.proyecto||'—'}</td>
-      <td style="padding:6px 4px;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
-      <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
-      <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);">${i.impacto_si_no_actua||'—'}</td>
-      <td style="padding:6px 0 6px 4px;font-size:11px;white-space:nowrap;">${fmtFecha(i.fecha_limite)}&nbsp;(${diasStr})</td>
+      <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;">${i.proyecto||'—'}<br>
+        <span style="font-size:10px;color:var(--ink3);font-weight:400;">${i.departamento||''}</span></td>
+      <td style="padding:6px 4px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
+      <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);vertical-align:top;">${i.accion_concreta||'—'}${opcionesHtml}</td>
+      <td style="padding:6px 4px;font-size:11px;color:var(--ink2);vertical-align:top;">${i.impacto_si_no_actua||'—'}</td>
+      <td style="padding:6px 0 6px 4px;font-size:11px;white-space:nowrap;vertical-align:top;">${fmtFecha(i.fecha_limite)}<br><span style="font-size:10px;">(${diasStr})</span></td>
     </tr>`;
   }
 
+  const theadInt = `<thead><tr>
+    <th style="width:18%;">Proyecto</th><th style="width:12%;">Tipo</th>
+    <th style="width:32%;">Qué se necesita</th><th style="width:28%;">Impacto si no actúas</th>
+    <th style="width:10%;">Límite</th>
+  </tr></thead>`;
+
   if (urgentes.length) {
     html += `<div id="ale-int-urgentes" class="panel" style="background:${BG_ALERTA};border-left:3px solid #8b0000;">
-      <div class="panel-head"><span class="eyebrow" style="color:#8b0000;">DECISIONES URGENTES</span>
-        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">límite en ≤ 5 días · ${urgentes.length}</span>
+      <div class="panel-head">
+        <span class="eyebrow" style="color:#8b0000;">● DECISIONES URGENTES</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">límite ≤ 5 días · ${urgentes.length}</span>
       </div>
-      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr><th style="width:20%;">Proyecto</th><th style="width:13%;">Tipo</th><th style="width:30%;">Qué se necesita</th><th style="width:27%;">Impacto si no actúas</th><th style="width:10%;">Límite</th></tr></thead>
-        <tbody>${urgentes.map(intRow).join('')}</tbody>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">${theadInt}
+        <tbody>${urgentes.map(intRowAle).join('')}</tbody>
       </table></div>
     </div>`;
   }
 
   if (proximas.length) {
     html += `<div id="ale-int-proximas" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
-      <div class="panel-head"><span class="eyebrow">PRÓXIMAS INTERVENCIONES</span>
+      <div class="panel-head">
+        <span class="eyebrow">PRÓXIMAS INTERVENCIONES</span>
         <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">6–14 días · ${proximas.length}</span>
       </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">${theadInt}
+        <tbody>${proximas.map(intRowAle).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  if (reuniones.length) {
+    html += `<div id="ale-int-reuniones" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+      <div class="panel-head">
+        <span class="eyebrow">REUNIONES CON TU PRESENCIA</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${reuniones.length}</span>
+      </div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr><th style="width:20%;">Proyecto</th><th style="width:13%;">Tipo</th><th style="width:30%;">Qué se necesita</th><th style="width:27%;">Impacto si no actúas</th><th style="width:10%;">Límite</th></tr></thead>
-        <tbody>${proximas.map(intRow).join('')}</tbody>
+        <thead><tr><th>Proyecto</th><th>Acción</th><th>Impacto</th><th>Fecha</th></tr></thead>
+        <tbody>${reuniones.map(intRowAle).join('')}</tbody>
       </table></div>
     </div>`;
   }
@@ -1156,15 +1130,23 @@ function renderAlejandra() {
         <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
         <td style="padding:5px 4px;font-size:10px;font-weight:600;color:#2a7a2a;">Resuelta</td>
         <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.decision_adoptada||'—'}</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.responsable_ejecucion||'—'}</td>
         <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${fmtFecha(i.fecha_resolucion)}</td>
       </tr>`
     ).join('');
     html += `<div id="ale-int-resueltas" class="panel" style="background:var(--bg2);border-left:3px solid #2a7a2a;">
       <div class="panel-head"><span class="eyebrow" style="color:#2a7a2a;">RESUELTAS RECIENTEMENTE</span></div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr><th>Proyecto</th><th>Estado</th><th>Decisión adoptada</th><th>Fecha</th></tr></thead>
+        <thead><tr><th>Proyecto</th><th>Estado</th><th>Decisión adoptada</th><th>Ejecuta</th><th>Fecha</th></tr></thead>
         <tbody>${filasResueltas}</tbody>
       </table></div>
+    </div>`;
+  }
+
+  // Estado vacío: sin intervenciones publicadas
+  if (!urgentes.length && !proximas.length && !reuniones.length && !resueltas.length) {
+    html += `<div class="panel" style="background:var(--bg2);border-left:3px solid var(--rule);">
+      <p class="panel-note" style="padding:16px 0;">Sin intervenciones publicadas esta semana.</p>
     </div>`;
   }
 
@@ -1319,7 +1301,44 @@ function renderCicloSemanalJavi() {
     </div>`;
   }
 
-  /* ── 4. ARRASTRADOS EN REVISIÓN (> 2 semanas) ──────────────── */
+  /* ── 4. BLOQUEADOS SIN INTERVENCIÓN ───────────────────────── */
+  // Objetivos en estado Bloqueado que NO tienen ninguna intervención vinculada activa
+  const intIdsBloqueados = new Set(
+    intervenciones
+      .filter(i => i.estado !== 'Resuelta' && i.estado !== 'Descartada' && i.objetivo_vinculado_id)
+      .map(i => i.objetivo_vinculado_id)
+  );
+  const bloqueadosSinInt = objetivos.filter(o =>
+    o.estado === 'Bloqueado' && !intIdsBloqueados.has(o.id)
+  );
+  if (bloqueadosSinInt.length) {
+    const filas = bloqueadosSinInt.map(o => {
+      const dias = diasRestantes(o.fecha_limite);
+      const diasStr = dias === null ? '—' : dias < 0 ? `<span style="color:#c00;font-weight:600;">+${Math.abs(dias)}d</span>` : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>` : `${dias}d`;
+      return `<tr style="border-top:1px solid var(--rule);">
+        <td style="padding:5px 4px 5px 0;font-size:12px;font-weight:500;">${o.proyecto||'—'}</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${o.responsable||'—'}</td>
+        <td style="padding:5px 4px;">${prioTag(o.prioridad)}</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${fmtFecha(o.fecha_limite)}&nbsp;(${diasStr})</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);max-width:200px;">${o.descripcion||'—'}</td>
+      </tr>`;
+    }).join('');
+    html += `<div id="pm-bloqueados" class="panel" style="background:${BG_ALERTA};border-left:3px solid #8b0000;">
+      <div class="panel-head">
+        <span class="eyebrow" style="color:#8b0000;">● BLOQUEADOS SIN INTERVENCIÓN</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${bloqueadosSinInt.length} objetivo${bloqueadosSinInt.length!==1?'s':''} · escalar a Dirección</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:22%;">Proyecto</th><th style="width:14%;">Responsable</th>
+          <th style="width:10%;">Prio</th><th style="width:16%;">Límite</th><th style="width:38%;">Objetivo</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  /* ── 5. ARRASTRADOS EN REVISIÓN (> 2 semanas) ──────────────── */
   const arrastrados = objetivos.filter(o => (o.semanas_arrastrado||0) > 2);
   if (arrastrados.length) {
     const filas = arrastrados.map(o =>
