@@ -734,47 +734,52 @@ def _leer_json_ciclo(filename):
 _obj_raw  = _leer_json_ciclo('objetivos_semana.json')
 _int_raw  = _leer_json_ciclo('intervenciones_direccion.json')
 
-# Objetivos: solo inyectar si la semana está Publicada; historiales siempre disponibles
-if _obj_raw and _obj_raw.get('estado_publicacion') == 'Publicado':
-    OBJETIVOS_SEMANA = {
-        'semana':             _obj_raw.get('semana', ''),
-        'fecha_inicio_semana':_obj_raw.get('fecha_inicio_semana', ''),
-        'fecha_publicacion':  _obj_raw.get('fecha_publicacion'),
-        'objetivos':          _obj_raw.get('objetivos', []),
-        'historial':          _obj_raw.get('historial', []),
-    }
-    print(f"Objetivos semana {OBJETIVOS_SEMANA['semana']}: "
-          f"{len(OBJETIVOS_SEMANA['objetivos'])} objetivos publicados, "
-          f"{len(OBJETIVOS_SEMANA['historial'])} semanas en historial")
-else:
-    # Borrador o JSON vacío: sin objetivos activos pero historial disponible
-    OBJETIVOS_SEMANA = {
-        'semana':             _obj_raw.get('semana', '') if _obj_raw else '',
-        'fecha_inicio_semana':_obj_raw.get('fecha_inicio_semana', '') if _obj_raw else '',
-        'fecha_publicacion':  None,
-        'objetivos':          [],  # borradores no visibles
-        'historial':          _obj_raw.get('historial', []) if _obj_raw else [],
-    }
-    estado_obj = _obj_raw.get('estado_publicacion', 'ausente') if _obj_raw else 'ausente'
-    print(f"Objetivos semana: estado={estado_obj} — objetivos activos no publicados (ocultos)")
+# ── ATOMICIDAD ────────────────────────────────────────────────────────────────
+# La publicación es un acto único: objetivos e intervenciones se publican juntos
+# o no se publica ninguno. El flag de publicación de objetivos_semana.json es
+# el control maestro. Si está en Borrador, ambos salen vacíos en la App.
+# El historial de semanas anteriores se preserva siempre, independientemente
+# del estado de publicación de la semana activa.
+_obj_publicado = bool(_obj_raw and _obj_raw.get('estado_publicacion') == 'Publicado')
+_int_publicado = bool(_int_raw and _int_raw.get('estado_publicacion') == 'Publicado')
 
-# Intervenciones: solo las publicadas (estado_publicacion a nivel de cada intervención).
-# La publicación es atómica: cuando el PM publica, todas las intervenciones
-# del JSON pasan a visible simultáneamente con los objetivos.
-# El campo estado_publicacion del JSON raíz controla la visibilidad global.
-if _int_raw:
-    _int_publicadas = [
-        i for i in _int_raw.get('intervenciones', [])
-        if i.get('estado_publicacion') == 'Publicado'
-    ]
-    INTERVENCIONES_DIR = {
-        'fecha_actualizacion': _int_raw.get('fecha_actualizacion'),
-        'intervenciones':      _int_publicadas,
-    }
-    print(f"Intervenciones dirección: {len(_int_publicadas)} publicadas "
-          f"(de {len(_int_raw.get('intervenciones',[]))} totales)")
-else:
-    INTERVENCIONES_DIR = {'fecha_actualizacion': None, 'intervenciones': []}
+# Ambos deben estar Publicados para que aparezca cualquiera de los dos.
+# Si solo uno está publicado y el otro no, ninguno se muestra (atomicidad).
+_ciclo_publicado = _obj_publicado and _int_publicado
+
+if not _ciclo_publicado:
+    _estado_log = []
+    if _obj_raw:
+        _estado_log.append(f"objetivos={_obj_raw.get('estado_publicacion','ausente')}")
+    else:
+        _estado_log.append("objetivos=archivo_no_encontrado")
+    if _int_raw:
+        _estado_log.append(f"intervenciones={_int_raw.get('estado_publicacion','ausente')}")
+    else:
+        _estado_log.append("intervenciones=archivo_no_encontrado")
+    print(f"Ciclo semanal: borrador — {', '.join(_estado_log)} — nada visible en App")
+
+# Historial: siempre disponible (permite trazabilidad de semanas anteriores)
+_historial = _obj_raw.get('historial', []) if _obj_raw else []
+
+OBJETIVOS_SEMANA = {
+    'semana':             _obj_raw.get('semana', '') if _obj_raw else '',
+    'fecha_inicio_semana':_obj_raw.get('fecha_inicio_semana', '') if _obj_raw else '',
+    'fecha_publicacion':  _obj_raw.get('fecha_publicacion') if _ciclo_publicado else None,
+    'objetivos':          _obj_raw.get('objetivos', []) if _ciclo_publicado else [],
+    'historial':          _historial,   # siempre presente para trazabilidad
+}
+
+INTERVENCIONES_DIR = {
+    'fecha_actualizacion': _int_raw.get('fecha_actualizacion') if _ciclo_publicado and _int_raw else None,
+    'intervenciones':      _int_raw.get('intervenciones', []) if _ciclo_publicado and _int_raw else [],
+}
+
+if _ciclo_publicado:
+    print(f"Ciclo semanal PUBLICADO: semana {OBJETIVOS_SEMANA['semana']} · "
+          f"{len(OBJETIVOS_SEMANA['objetivos'])} objetivos · "
+          f"{len(INTERVENCIONES_DIR['intervenciones'])} intervenciones · "
+          f"{len(_historial)} semanas en historial")
 
 # ── GENERAR DATA JS ───────────────────────────────────────────────────────────
 DATA_JS = f"""
