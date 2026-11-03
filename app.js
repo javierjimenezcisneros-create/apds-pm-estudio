@@ -810,7 +810,260 @@ function renderAlejandra() {
     </div>`;
   }
 
+  /* ── Secciones de intervenciones de dirección ─────────────── */
+  const int_d = (typeof INTERVENCIONES_DIR !== 'undefined') ? INTERVENCIONES_DIR : null;
+  const intervenciones = (int_d && int_d.intervenciones) ? int_d.intervenciones : [];
+  const hoyD = new Date(); hoyD.setHours(0,0,0,0);
+
+  // Decisiones urgentes: fecha_limite ≤ 5 días y estado Pendiente/En revisión
+  const urgentes = intervenciones.filter(i => {
+    if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
+    const d = diasRestantes(i.fecha_limite);
+    return d !== null && d <= 5;
+  }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
+
+  // Próximas: 6–14 días
+  const proximas = intervenciones.filter(i => {
+    if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
+    const d = diasRestantes(i.fecha_limite);
+    return d !== null && d >= 6 && d <= 14;
+  }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
+
+  // Resueltas recientemente: últimas 7 con decision_adoptada
+  const resueltas = intervenciones
+    .filter(i => i.estado === 'Resuelta' && i.decision_adoptada)
+    .sort((a,b) => (b.fecha_resolucion||'').localeCompare(a.fecha_resolucion||''))
+    .slice(0, 7);
+
+  function intRow(i) {
+    const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
+    const dias = diasRestantes(i.fecha_limite);
+    const diasStr = dias === null ? '—' : dias < 0 ? `<span style="color:#c00;font-weight:600;">vencida</span>` : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>` : `${dias}d`;
+    return `<tr style="border-top:1px solid var(--rule);">
+      <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;">${i.proyecto||'—'}</td>
+      <td style="padding:6px 4px;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
+      <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
+      <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);">${i.impacto_si_no_actua||'—'}</td>
+      <td style="padding:6px 0 6px 4px;font-size:11px;white-space:nowrap;">${fmtFecha(i.fecha_limite)}&nbsp;(${diasStr})</td>
+    </tr>`;
+  }
+
+  if (urgentes.length) {
+    html += `<div id="ale-int-urgentes" class="panel" style="background:${BG_ALERTA};border-left:3px solid #8b0000;">
+      <div class="panel-head"><span class="eyebrow" style="color:#8b0000;">DECISIONES URGENTES</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">límite en ≤ 5 días · ${urgentes.length}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr><th style="width:20%;">Proyecto</th><th style="width:13%;">Tipo</th><th style="width:30%;">Qué se necesita</th><th style="width:27%;">Impacto si no actúas</th><th style="width:10%;">Límite</th></tr></thead>
+        <tbody>${urgentes.map(intRow).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  if (proximas.length) {
+    html += `<div id="ale-int-proximas" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
+      <div class="panel-head"><span class="eyebrow">PRÓXIMAS INTERVENCIONES</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">6–14 días · ${proximas.length}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr><th style="width:20%;">Proyecto</th><th style="width:13%;">Tipo</th><th style="width:30%;">Qué se necesita</th><th style="width:27%;">Impacto si no actúas</th><th style="width:10%;">Límite</th></tr></thead>
+        <tbody>${proximas.map(intRow).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  if (resueltas.length) {
+    const filasResueltas = resueltas.map(i =>
+      `<tr style="border-top:1px solid var(--rule);">
+        <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
+        <td style="padding:5px 4px;font-size:10px;font-weight:600;color:#2a7a2a;">Resuelta</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.decision_adoptada||'—'}</td>
+        <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${fmtFecha(i.fecha_resolucion)}</td>
+      </tr>`
+    ).join('');
+    html += `<div id="ale-int-resueltas" class="panel" style="background:var(--bg2);border-left:3px solid #2a7a2a;">
+      <div class="panel-head"><span class="eyebrow" style="color:#2a7a2a;">RESUELTAS RECIENTEMENTE</span></div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr><th>Proyecto</th><th>Estado</th><th>Decisión adoptada</th><th>Fecha</th></tr></thead>
+        <tbody>${filasResueltas}</tbody>
+      </table></div>
+    </div>`;
+  }
+
   document.getElementById('view').innerHTML = html;
+}
+
+/* ── Helpers — ciclo semanal ─────────────────────────────── */
+function diasRestantes(fechaLimite) {
+  if (!fechaLimite) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const lim = new Date(fechaLimite); lim.setHours(0,0,0,0);
+  return Math.round((lim - hoy) / 86400000);
+}
+
+function fmtFecha(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(d)} ${meses[parseInt(m)-1]}`;
+}
+
+function prioTag(p) {
+  if (p === 'Alta')   return `<span style="color:#c00;font-size:10px;font-weight:600;text-transform:uppercase;">Alta</span>`;
+  if (p === 'Media')  return `<span style="color:#b06000;font-size:10px;font-weight:600;text-transform:uppercase;">Media</span>`;
+  return `<span style="color:var(--ink3);font-size:10px;">Baja</span>`;
+}
+
+function estadoObjTag(e) {
+  const m = {Pendiente:'#666',Completado:'#2a7a2a',Bloqueado:'#c00',Arrastrado:'#b06000','En curso':'#005f9e'};
+  return `<span style="color:${m[e]||'#666'};font-size:10px;font-weight:600;">${e||'—'}</span>`;
+}
+
+/* Render secciones ciclo semanal PM */
+function renderCicloSemanalJavi() {
+  const obj   = (typeof OBJETIVOS_SEMANA !== 'undefined') ? OBJETIVOS_SEMANA : null;
+  const int_d = (typeof INTERVENCIONES_DIR !== 'undefined') ? INTERVENCIONES_DIR : null;
+  const hoy   = new Date(); hoy.setHours(0,0,0,0);
+
+  let html = '';
+
+  /* ── 1. ESTA SEMANA — objetivos publicados ─────────────────── */
+  const objetivos = (obj && obj.objetivos) ? obj.objetivos : [];
+  if (objetivos.length) {
+    // Agrupar por departamento
+    const porDpto = {};
+    objetivos.forEach(o => {
+      const d = o.departamento || 'General';
+      if (!porDpto[d]) porDpto[d] = [];
+      porDpto[d].push(o);
+    });
+    // Ordenar cada grupo: Alta primero, luego por fecha_limite
+    Object.values(porDpto).forEach(arr => arr.sort((a,b) => {
+      const pp = {Alta:0,Media:1,Baja:2};
+      if ((pp[a.prioridad]||1) !== (pp[b.prioridad]||1)) return (pp[a.prioridad]||1)-(pp[b.prioridad]||1);
+      return (a.fecha_limite||'').localeCompare(b.fecha_limite||'');
+    }));
+
+    let filas = '';
+    const deptos = ['Vivienda','Restaurantes','Hoteles','General'];
+    deptos.forEach(d => {
+      if (!porDpto[d]) return;
+      filas += `<tr><td colspan="5" style="padding:6px 0 2px;font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">${d}</td></tr>`;
+      porDpto[d].forEach(o => {
+        const dias = diasRestantes(o.fecha_limite);
+        const diasStr = dias === null ? '—' : dias < 0 ? `<span style="color:#c00">+${Math.abs(dias)}d</span>` : dias <= 2 ? `<span style="color:#c00">${dias}d</span>` : `${dias}d`;
+        const arrastradoBadge = o.semanas_arrastrado > 0
+          ? `<span style="color:#b06000;font-size:9px;margin-left:4px;">↩ ×${o.semanas_arrastrado}</span>` : '';
+        filas += `<tr style="border-top:1px solid var(--rule);">
+          <td style="padding:5px 4px 5px 0;font-size:12px;">${o.proyecto||'—'}${arrastradoBadge}</td>
+          <td style="padding:5px 4px;font-size:11.5px;color:var(--ink2);">${o.responsable||'—'}</td>
+          <td style="padding:5px 4px;">${prioTag(o.prioridad)}</td>
+          <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${fmtFecha(o.fecha_limite)}&nbsp;(${diasStr})</td>
+          <td style="padding:5px 0 5px 4px;">${estadoObjTag(o.estado)}</td>
+        </tr>
+        <tr><td colspan="5" style="padding:0 0 6px;font-size:11px;color:var(--ink2);">${o.descripcion||''}</td></tr>`;
+      });
+    });
+
+    html += `<div id="pm-esta-semana" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${obj.semana||''} · ${objetivos.length} objetivo${objetivos.length!==1?'s':''}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:28%;">Proyecto</th><th style="width:14%;">Resp.</th>
+          <th style="width:10%;">Prio</th><th style="width:18%;">Límite</th><th style="width:14%;">Estado</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  /* ── 2. INTERVENCIONES PENDIENTES DIRECCIÓN ────────────────── */
+  const intervenciones = (int_d && int_d.intervenciones) ? int_d.intervenciones : [];
+  const pendientes = intervenciones.filter(i => i.estado === 'Pendiente' || i.estado === 'En revisión');
+  if (pendientes.length) {
+    const filas = pendientes.map(i => {
+      const dias = diasRestantes(i.fecha_limite);
+      const diasStr = dias === null ? '—' : dias < 0 ? `<span style="color:#c00;font-weight:600;">VENCIDA +${Math.abs(dias)}d</span>` : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>` : `${dias}d`;
+      const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
+      return `<tr style="border-top:1px solid var(--rule);">
+        <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
+        <td style="padding:5px 4px;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
+        <td style="padding:5px 0 5px 4px;font-size:11px;">${fmtFecha(i.fecha_limite)}&nbsp;(${diasStr})</td>
+      </tr>`;
+    }).join('');
+
+    html += `<div id="pm-intervenciones" class="panel" style="background:var(--bg2);border-left:3px solid #8b0000;">
+      <div class="panel-head"><span class="eyebrow" style="color:#8b0000;">INTERVENCIONES · DIRECCIÓN</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${pendientes.length} pendiente${pendientes.length!==1?'s':''}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:22%;">Proyecto</th><th style="width:14%;">Tipo</th>
+          <th style="width:44%;">Acción requerida</th><th style="width:20%;">Límite</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  /* ── 3. INTERVENCIONES RESUELTAS — REVISAR OBJETIVO ───────── */
+  const objIds = new Set(objetivos.map(o => o.id));
+  // También incluir bloqueados del historial reciente
+  const todosBloqueados = new Set();
+  (obj && obj.objetivos ? obj.objetivos : []).forEach(o => {
+    if (o.estado === 'Bloqueado') todosBloqueados.add(o.id);
+  });
+  (obj && obj.historial ? obj.historial : []).forEach(sem => {
+    (sem.objetivos||[]).forEach(o => { if (o.estado_final === 'Bloqueado') todosBloqueados.add(o.id); });
+  });
+
+  const resueltasRevisar = intervenciones.filter(i =>
+    i.estado === 'Resuelta' && i.objetivo_vinculado_id && todosBloqueados.has(i.objetivo_vinculado_id)
+  );
+  if (resueltasRevisar.length) {
+    const filas = resueltasRevisar.map(i =>
+      `<tr style="border-top:1px solid var(--rule);">
+        <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
+        <td style="padding:5px 4px;font-size:11px;color:#2a7a2a;font-weight:600;">Resuelta</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.decision_adoptada||'—'}</td>
+        <td style="padding:5px 0 5px 4px;font-size:11px;color:#c00;">Obj. ${i.objetivo_vinculado_id} — Bloqueado</td>
+      </tr>`
+    ).join('');
+    html += `<div id="pm-revisar" class="panel" style="background:var(--bg2);border-left:3px solid #b06000;">
+      <div class="panel-head"><span class="eyebrow" style="color:#b06000;">INTERVENCIÓN RESUELTA — REVISAR OBJETIVO</span></div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr><th>Proyecto</th><th>Estado int.</th><th>Decisión adoptada</th><th>Objetivo</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  /* ── 4. ARRASTRADOS EN REVISIÓN (> 2 semanas) ──────────────── */
+  const arrastrados = objetivos.filter(o => (o.semanas_arrastrado||0) > 2);
+  if (arrastrados.length) {
+    const filas = arrastrados.map(o =>
+      `<tr style="border-top:1px solid var(--rule);">
+        <td style="padding:5px 4px 5px 0;font-size:12px;">${o.proyecto||'—'}</td>
+        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${o.responsable||'—'}</td>
+        <td style="padding:5px 4px;font-size:11px;color:#b06000;font-weight:600;">${o.semanas_arrastrado} semanas</td>
+        <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink2);">${o.descripcion||'—'}</td>
+      </tr>`
+    ).join('');
+    html += `<div id="pm-arrastrados" class="panel" style="background:var(--bg2);border-left:3px solid #b06000;">
+      <div class="panel-head"><span class="eyebrow" style="color:#b06000;">ARRASTRADOS EN REVISIÓN</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${arrastrados.length} objetivo${arrastrados.length!==1?'s':''} · más de 2 semanas</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr><th>Proyecto</th><th>Responsable</th><th>Arrastrado</th><th>Objetivo</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  return html;
 }
 
 /* ── Render Javi — CENTRO DE CONTROL ──────────────────────── */
@@ -839,6 +1092,9 @@ function renderJavi() {
     </div>
   </div>
   ${indiceHtml}`;
+
+  /* Secciones del ciclo semanal — antes de los grupos de estado */
+  html += renderCicloSemanalJavi();
 
   GRUPOS.forEach(g => {
     if (!g.projs.length) return;

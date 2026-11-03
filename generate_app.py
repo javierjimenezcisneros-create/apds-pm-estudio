@@ -714,6 +714,68 @@ META = {
     'hoy_semana': HOY_SEMANA_LABEL,
 }
 
+# ── OBJETIVOS E INTERVENCIONES DE DIRECCIÓN ──────────────────────────────────
+# Los JSON se leen desde el repo. Solo se inyectan si estado_publicacion="Publicado".
+# En Borrador → objetos vacíos; los borradores nunca llegan al HTML (atomicidad).
+
+def _leer_json_ciclo(filename):
+    """Lee un JSON del ciclo semanal. Devuelve el dict o None si no existe/error."""
+    path = os.path.join(BASE, filename)
+    if not os.path.exists(path):
+        print(f"  ⚠ {filename} no encontrado — sección desactivada")
+        return None
+    try:
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"  ⚠ Error leyendo {filename}: {e}")
+        return None
+
+_obj_raw  = _leer_json_ciclo('objetivos_semana.json')
+_int_raw  = _leer_json_ciclo('intervenciones_direccion.json')
+
+# Objetivos: solo inyectar si la semana está Publicada; historiales siempre disponibles
+if _obj_raw and _obj_raw.get('estado_publicacion') == 'Publicado':
+    OBJETIVOS_SEMANA = {
+        'semana':             _obj_raw.get('semana', ''),
+        'fecha_inicio_semana':_obj_raw.get('fecha_inicio_semana', ''),
+        'fecha_publicacion':  _obj_raw.get('fecha_publicacion'),
+        'objetivos':          _obj_raw.get('objetivos', []),
+        'historial':          _obj_raw.get('historial', []),
+    }
+    print(f"Objetivos semana {OBJETIVOS_SEMANA['semana']}: "
+          f"{len(OBJETIVOS_SEMANA['objetivos'])} objetivos publicados, "
+          f"{len(OBJETIVOS_SEMANA['historial'])} semanas en historial")
+else:
+    # Borrador o JSON vacío: sin objetivos activos pero historial disponible
+    OBJETIVOS_SEMANA = {
+        'semana':             _obj_raw.get('semana', '') if _obj_raw else '',
+        'fecha_inicio_semana':_obj_raw.get('fecha_inicio_semana', '') if _obj_raw else '',
+        'fecha_publicacion':  None,
+        'objetivos':          [],  # borradores no visibles
+        'historial':          _obj_raw.get('historial', []) if _obj_raw else [],
+    }
+    estado_obj = _obj_raw.get('estado_publicacion', 'ausente') if _obj_raw else 'ausente'
+    print(f"Objetivos semana: estado={estado_obj} — objetivos activos no publicados (ocultos)")
+
+# Intervenciones: solo las publicadas (estado_publicacion a nivel de cada intervención).
+# La publicación es atómica: cuando el PM publica, todas las intervenciones
+# del JSON pasan a visible simultáneamente con los objetivos.
+# El campo estado_publicacion del JSON raíz controla la visibilidad global.
+if _int_raw:
+    _int_publicadas = [
+        i for i in _int_raw.get('intervenciones', [])
+        if i.get('estado_publicacion') == 'Publicado'
+    ]
+    INTERVENCIONES_DIR = {
+        'fecha_actualizacion': _int_raw.get('fecha_actualizacion'),
+        'intervenciones':      _int_publicadas,
+    }
+    print(f"Intervenciones dirección: {len(_int_publicadas)} publicadas "
+          f"(de {len(_int_raw.get('intervenciones',[]))} totales)")
+else:
+    INTERVENCIONES_DIR = {'fecha_actualizacion': None, 'intervenciones': []}
+
 # ── GENERAR DATA JS ───────────────────────────────────────────────────────────
 DATA_JS = f"""
 const MASTER_DATA = {json.dumps(MASTER_DATA, ensure_ascii=False)};
@@ -742,6 +804,8 @@ const NOMBRE_PERSONA = {json.dumps(NOMBRE_PERSONA, ensure_ascii=False)};
 const VAC = {json.dumps(VAC, ensure_ascii=False)};
 const DEPT_SECTIONS = {json.dumps(DEPT_SECTIONS, ensure_ascii=False)};
 const PERSON_ORDER = {json.dumps(PERSON_ORDER)};
+const OBJETIVOS_SEMANA = {json.dumps(OBJETIVOS_SEMANA, ensure_ascii=False)};
+const INTERVENCIONES_DIR = {json.dumps(INTERVENCIONES_DIR, ensure_ascii=False)};
 """
 
 # ── CONSTRUIR HTML ────────────────────────────────────────────────────────────
