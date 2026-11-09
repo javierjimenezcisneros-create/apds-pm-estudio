@@ -727,148 +727,222 @@ function indexBtn(id, label, bg, borde, count) {
 
 /* ── Render Alejandra — DIRECCIÓN ─────────────────────────── */
 function renderAlejandra() {
-  // Panel de Dirección: muestra EXCLUSIVAMENTE intervenciones escaladas por el PM.
-  // No muestra información operativa del equipo (alertas, Gantt, cargas, objetivos completos).
-  // Especificación v1.1 aprobada: secciones Decisiones urgentes, Próximas intervenciones,
-  // Reuniones con su presencia, Resueltas recientemente.
-  const sem = hoySemana();
+  // Panel mixto: estado operativo del Excel (siempre visible) +
+  // intervenciones específicas escaladas por el PM (cuando publicadas).
+  const todos = (MASTER_DATA||[]).map(enrich);
+  const sem   = hoySemana();
 
+  // ── Datos del Excel ──────────────────────────────────────────
+  const alerta   = todos.filter(p => atLevel(p) === 0);
+  const atencion = todos.filter(p => atLevel(p) === 1);
+
+  const estaSemanaAlert  = todos.filter(p => atLevel(p) <= 1 && projHasActivityThisWeek(p));
+  const estaSemanaNormal = todos.filter(p => atLevel(p) > 1  && projHasActivityThisWeek(p));
+  const estaSemana = [...estaSemanaAlert, ...estaSemanaNormal];
+
+  const proximamente = todos
+    .filter(p => projHasActivityInWindow(p, 1, 3))
+    .sort((a,b) => {
+      const da = a._g?.fecha_hito||'', db = b._g?.fecha_hito||'';
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+
+  // ── Intervenciones escaladas (JSON) ─────────────────────────
   const int_d = (typeof INTERVENCIONES_DIR !== 'undefined') ? INTERVENCIONES_DIR : null;
   const intervenciones = (int_d && int_d.intervenciones) ? int_d.intervenciones : [];
 
-  // Decisiones urgentes: Pendiente/En revisión con fecha_limite ≤ 5 días
   const urgentes = intervenciones.filter(i => {
     if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
     const d = diasRestantes(i.fecha_limite);
     return d !== null && d <= 5;
   }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
 
-  // Próximas intervenciones: 6–14 días
-  const proximas = intervenciones.filter(i => {
+  const intProximas = intervenciones.filter(i => {
     if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
     const d = diasRestantes(i.fecha_limite);
     return d !== null && d >= 6 && d <= 14;
   }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
 
-  // Reuniones con presencia de Alejandra
   const reuniones = intervenciones.filter(i =>
     i.tipo === 'Reunión' && i.estado !== 'Resuelta' && i.estado !== 'Descartada'
   ).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
 
-  // Resueltas recientemente: últimas 7 con decision_adoptada (gravedad_pm nunca expuesto)
-  const resueltas = intervenciones
+  const intResueltas = intervenciones
     .filter(i => i.estado === 'Resuelta' && i.decision_adoptada)
     .sort((a,b) => (b.fecha_resolucion||'').localeCompare(a.fecha_resolucion||''))
     .slice(0, 7);
 
-  const totalPendientes = urgentes.length + proximas.length;
+  const hayIntervenciones = urgentes.length || intProximas.length || reuniones.length || intResueltas.length;
+  const totalInt = urgentes.length + intProximas.length;
 
-  // Índice de navegación
+  // ── Índice de navegación ─────────────────────────────────────
   const indiceHtml = `
     <div class="idx-nav" style="margin-bottom:20px;">
-      ${urgentes.length  ? indexBtn('ale-int-urgentes',  '● URGENTE',           BG_ALERTA,    BORDE_ALERTA,  urgentes.length)  : ''}
-      ${proximas.length  ? indexBtn('ale-int-proximas',  'PRÓXIMAS',            BG_PROX,      BORDE_PROX,    proximas.length)  : ''}
-      ${reuniones.length ? indexBtn('ale-int-reuniones', 'REUNIONES',           BG_SEMANA,    BORDE_SEMANA,  reuniones.length) : ''}
-      ${resueltas.length ? indexBtn('ale-int-resueltas', 'RESUELTAS',           'var(--bg2)', '#2a7a2a',     resueltas.length) : ''}
+      ${urgentes.length    ? indexBtn('ale-int-urgentes',  '● DECISIÓN URGENTE',  BG_ALERTA,    '#8b0000',     urgentes.length)    : ''}
+      ${alerta.length      ? indexBtn('ale-alerta',        '● ALERTA',            BG_ALERTA,    BORDE_ALERTA,  alerta.length)      : ''}
+      ${atencion.length    ? indexBtn('ale-atencion',      '● ATENCIÓN',          BG_ATENCION,  BORDE_ATENCION,atencion.length)    : ''}
+      ${estaSemana.length  ? indexBtn('ale-semana',        'ESTA SEMANA',         BG_SEMANA,    BORDE_SEMANA,  estaSemana.length)  : ''}
+      ${proximamente.length? indexBtn('ale-prox',          'PRÓXIMAMENTE',        BG_PROX,      BORDE_PROX,    proximamente.length): ''}
+      ${intProximas.length ? indexBtn('ale-int-proximas',  'INT. PRÓXIMAS',       BG_PROX,      BORDE_PROX,    intProximas.length) : ''}
     </div>`;
 
+  const subLine = totalInt
+    ? ` · ${totalInt} intervención${totalInt!==1?'es':''} pendiente${totalInt!==1?'s':''}`
+    : '';
   let html = `<div class="view-head">
     <div>
       <div class="view-title">DIRECCIÓN</div>
-      <div class="view-sub">${sem}${totalPendientes ? ` · ${totalPendientes} intervención${totalPendientes!==1?'es':''} pendiente${totalPendientes!==1?'s':''}` : ' · sin intervenciones pendientes'}</div>
+      <div class="view-sub">${sem} · ${todos.length} proyectos${subLine}</div>
     </div>
   </div>
   ${indiceHtml}`;
 
-  // Helper fila de intervención para Alejandra (sin gravedad_pm)
-  function intRowAle(i) {
-    const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
-    const dias = diasRestantes(i.fecha_limite);
-    const diasStr = dias === null ? '—'
-      : dias < 0 ? `<span style="color:#c00;font-weight:600;">vencida +${Math.abs(dias)}d</span>`
-      : dias === 0 ? `<span style="color:#c00;font-weight:600;">hoy</span>`
-      : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>`
-      : `${dias}d`;
-    // Opciones si es Decisión o Aprobación
-    const opcionesHtml = (i.opciones && i.opciones.length && (i.tipo === 'Decisión' || i.tipo === 'Aprobación'))
-      ? `<div style="margin-top:4px;font-size:10.5px;color:var(--ink3);">${i.opciones.map(o=>`<span style="margin-right:10px;">▸ <strong>${o.label}</strong>: ${o.consecuencia}</span>`).join('')}</div>`
-      : '';
-    return `<tr style="border-top:1px solid var(--rule);">
-      <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;">${i.proyecto||'—'}<br>
-        <span style="font-size:10px;color:var(--ink3);font-weight:400;">${i.departamento||''}</span></td>
-      <td style="padding:6px 4px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
-      <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);vertical-align:top;">${i.accion_concreta||'—'}${opcionesHtml}</td>
-      <td style="padding:6px 4px;font-size:11px;color:var(--ink2);vertical-align:top;">${i.impacto_si_no_actua||'—'}</td>
-      <td style="padding:6px 0 6px 4px;font-size:11px;white-space:nowrap;vertical-align:top;">${fmtFecha(i.fecha_limite)}<br><span style="font-size:10px;">(${diasStr})</span></td>
-    </tr>`;
-  }
-
-  const theadInt = `<thead><tr>
-    <th style="width:18%;">Proyecto</th><th style="width:12%;">Tipo</th>
-    <th style="width:32%;">Qué se necesita</th><th style="width:28%;">Impacto si no actúas</th>
-    <th style="width:10%;">Límite</th>
-  </tr></thead>`;
-
+  // ── Bloque 1: Decisiones urgentes (intervenciones ≤5 días) ──
   if (urgentes.length) {
+    function intRowAle(i) {
+      const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
+      const dias = diasRestantes(i.fecha_limite);
+      const diasStr = dias === null ? '—'
+        : dias < 0 ? `<span style="color:#c00;font-weight:600;">vencida +${Math.abs(dias)}d</span>`
+        : dias === 0 ? `<span style="color:#c00;font-weight:600;">hoy</span>`
+        : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>`
+        : `${dias}d`;
+      return `<tr style="border-top:1px solid var(--rule);">
+        <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;">${i.proyecto||'—'}<br>
+          <span style="font-size:10px;color:var(--ink3);font-weight:400;">${i.departamento||''}</span></td>
+        <td style="padding:6px 4px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
+        <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);vertical-align:top;">${i.accion_concreta||'—'}</td>
+        <td style="padding:6px 4px;font-size:11px;color:var(--ink2);vertical-align:top;">${i.impacto_si_no_actua||'—'}</td>
+        <td style="padding:6px 0 6px 4px;font-size:11px;white-space:nowrap;vertical-align:top;">${fmtFecha(i.fecha_limite)}<br><span style="font-size:10px;">(${diasStr})</span></td>
+      </tr>`;
+    }
     html += `<div id="ale-int-urgentes" class="panel" style="background:${BG_ALERTA};border-left:3px solid #8b0000;">
       <div class="panel-head">
-        <span class="eyebrow" style="color:#8b0000;">● DECISIONES URGENTES</span>
+        <span class="eyebrow" style="color:#8b0000;">● DECISIONES URGENTES · JAVIER ESCALA</span>
         <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">límite ≤ 5 días · ${urgentes.length}</span>
       </div>
-      <div class="tbl-wrap"><table class="tbl" style="width:100%;">${theadInt}
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:18%;">Proyecto</th><th style="width:11%;">Tipo</th>
+          <th style="width:31%;">Qué se necesita</th><th style="width:28%;">Impacto si no actúas</th>
+          <th style="width:12%;">Límite</th>
+        </tr></thead>
         <tbody>${urgentes.map(intRowAle).join('')}</tbody>
       </table></div>
     </div>`;
   }
 
-  if (proximas.length) {
-    html += `<div id="ale-int-proximas" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
-      <div class="panel-head">
-        <span class="eyebrow">PRÓXIMAS INTERVENCIONES</span>
-        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">6–14 días · ${proximas.length}</span>
-      </div>
-      <div class="tbl-wrap"><table class="tbl" style="width:100%;">${theadInt}
-        <tbody>${proximas.map(intRowAle).join('')}</tbody>
+  // ── Bloque 2: Alerta (Excel) ─────────────────────────────────
+  html += `<div id="ale-alerta" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
+    <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}&ensp;<span style="font-weight:300;color:var(--ink3);">${alerta.length}</span></div>
+    ${alerta.length ? alerta.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
+  </div>`;
+
+  // ── Bloque 3: Atención (Excel) ───────────────────────────────
+  html += `<div id="ale-atencion" class="panel" style="background:${BG_ATENCION};border-left:3px solid ${BORDE_ATENCION};">
+    <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}&ensp;<span style="font-weight:300;color:var(--ink3);">${atencion.length}</span></div>
+    ${atencion.length ? atencion.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
+  </div>`;
+
+  // ── Bloque 4: Esta semana (Excel) ────────────────────────────
+  if (estaSemana.length) {
+    html += `<div id="ale-semana" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span> <span style="font-size:11px;color:var(--ink3);font-weight:300;">${sem}</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Actividad</th><th>Próximo hito</th><th>Fecha</th></tr></thead>
+        <tbody>
+          ${estaSemana.map(p => {
+            const entry = (p._p?.timeline||[]).find(t => t.semana === sem);
+            const act   = (entry?.actividades||[]).map(a=>a.texto).join(', ') || '—';
+            return `<tr style="cursor:pointer;" data-open="${p.id}">
+              <td><strong>${p.nombre}</strong></td>
+              <td>${tagHtml(...deptTag(p.dpto))}</td>
+              <td style="color:var(--ink2);">${act}</td>
+              <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
+              <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
       </table></div>
     </div>`;
   }
 
+  // ── Bloque 5: Próximamente (Excel) ───────────────────────────
+  if (proximamente.length) {
+    html += `<div id="ale-prox" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
+      <div class="panel-head"><span class="eyebrow">PRÓXIMAMENTE</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
+        <tbody>
+          ${proximamente.map(p => `<tr style="cursor:pointer;" data-open="${p.id}">
+            <td><strong>${p.nombre}</strong></td>
+            <td>${tagHtml(...deptTag(p.dpto))}</td>
+            <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
+            <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── Bloque 6: Próximas intervenciones escaladas (6–14 días) ──
+  if (intProximas.length) {
+    html += `<div id="ale-int-proximas" class="panel" style="background:var(--bg2);border-left:3px solid ${BORDE_PROX};">
+      <div class="panel-head">
+        <span class="eyebrow">PRÓXIMAS INTERVENCIONES · JAVIER ESCALA</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">6–14 días · ${intProximas.length}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:20%;">Proyecto</th><th style="width:12%;">Tipo</th>
+          <th style="width:38%;">Qué se necesita</th><th style="width:30%;">Impacto</th>
+        </tr></thead>
+        <tbody>${intProximas.map(i => {
+          const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
+          const dias = diasRestantes(i.fecha_limite);
+          const diasStr = dias === null ? '—' : `${dias}d (${fmtFecha(i.fecha_limite)})`;
+          return `<tr style="border-top:1px solid var(--rule);">
+            <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
+            <td style="padding:5px 4px;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
+            <td style="padding:5px 4px;font-size:11.5px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
+            <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${diasStr}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── Bloque 7: Reuniones con presencia ────────────────────────
   if (reuniones.length) {
-    html += `<div id="ale-int-reuniones" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
+    html += `<div id="ale-int-reuniones" class="panel" style="background:var(--bg2);border-left:3px solid ${BORDE_SEMANA};">
       <div class="panel-head">
         <span class="eyebrow">REUNIONES CON TU PRESENCIA</span>
         <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${reuniones.length}</span>
       </div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr><th>Proyecto</th><th>Acción</th><th>Impacto</th><th>Fecha</th></tr></thead>
-        <tbody>${reuniones.map(intRowAle).join('')}</tbody>
+        <thead><tr><th>Proyecto</th><th>Acción requerida</th><th>Límite</th></tr></thead>
+        <tbody>${reuniones.map(i => `<tr style="border-top:1px solid var(--rule);">
+          <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
+          <td style="padding:5px 4px;font-size:11.5px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
+          <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--cop);">${fmtFecha(i.fecha_limite)}</td>
+        </tr>`).join('')}</tbody>
       </table></div>
     </div>`;
   }
 
-  if (resueltas.length) {
-    const filasResueltas = resueltas.map(i =>
-      `<tr style="border-top:1px solid var(--rule);">
-        <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
-        <td style="padding:5px 4px;font-size:10px;font-weight:600;color:#2a7a2a;">Resuelta</td>
-        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.decision_adoptada||'—'}</td>
-        <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.responsable_ejecucion||'—'}</td>
-        <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${fmtFecha(i.fecha_resolucion)}</td>
-      </tr>`
-    ).join('');
+  // ── Bloque 8: Resueltas recientemente ────────────────────────
+  if (intResueltas.length) {
     html += `<div id="ale-int-resueltas" class="panel" style="background:var(--bg2);border-left:3px solid #2a7a2a;">
       <div class="panel-head"><span class="eyebrow" style="color:#2a7a2a;">RESUELTAS RECIENTEMENTE</span></div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr><th>Proyecto</th><th>Estado</th><th>Decisión adoptada</th><th>Ejecuta</th><th>Fecha</th></tr></thead>
-        <tbody>${filasResueltas}</tbody>
+        <thead><tr><th>Proyecto</th><th>Decisión adoptada</th><th>Ejecuta</th><th>Fecha</th></tr></thead>
+        <tbody>${intResueltas.map(i => `<tr style="border-top:1px solid var(--rule);">
+          <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
+          <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.decision_adoptada||'—'}</td>
+          <td style="padding:5px 4px;font-size:11px;color:var(--ink2);">${i.responsable_ejecucion||'—'}</td>
+          <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${fmtFecha(i.fecha_resolucion)}</td>
+        </tr>`).join('')}</tbody>
       </table></div>
-    </div>`;
-  }
-
-  // Estado vacío: sin intervenciones publicadas
-  if (!urgentes.length && !proximas.length && !reuniones.length && !resueltas.length) {
-    html += `<div class="panel" style="background:var(--bg2);border-left:3px solid var(--rule);">
-      <p class="panel-note" style="padding:16px 0;">Sin intervenciones publicadas esta semana.</p>
     </div>`;
   }
 
