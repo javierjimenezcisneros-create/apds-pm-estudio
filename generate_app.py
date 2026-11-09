@@ -89,9 +89,9 @@ def find_sheet(*keywords):
     return None
 
 # ── MASTER GLOBAL ─────────────────────────────────────────────────────────────
-# Cols Master(7+): PROYECTO | DPTO | EQUIPO | ESTADO | PRÓXIMO HITO | FECHA |
+# Cols Master (17): PROYECTO | DPTO | EQUIPO | ESTADO | PRÓXIMO HITO | FECHA |
 #   BLOQUEADOR | CONSTRUCTORA | FASE | ATENCIÓN | FIN OBRA PREVISTO |
-#   MONTAJE PREVISTO | FINALIZACIÓN OFICIAL | DECO CERRADA |
+#   MONTAJE PREVISTO | FINALIZACIÓN OFICIAL | OBSERVACIONES | DECO CERRADA |
 #   PRESUPUESTO DECO ACEPTADO | PEDIDOS CONFIRMADOS
 #   [opcionales idx16: ACCIÓN CONCRETA  idx17: CUÁNDO]
 def extract_master():
