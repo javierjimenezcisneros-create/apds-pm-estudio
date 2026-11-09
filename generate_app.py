@@ -89,9 +89,9 @@ def find_sheet(*keywords):
     return None
 
 # ── MASTER GLOBAL ─────────────────────────────────────────────────────────────
-# Cols Master (17): PROYECTO | DPTO | EQUIPO | ESTADO | PRÓXIMO HITO | FECHA |
+# Cols Master(7+): PROYECTO | DPTO | EQUIPO | ESTADO | PRÓXIMO HITO | FECHA |
 #   BLOQUEADOR | CONSTRUCTORA | FASE | ATENCIÓN | FIN OBRA PREVISTO |
-#   MONTAJE PREVISTO | FINALIZACIÓN OFICIAL | OBSERVACIONES | DECO CERRADA |
+#   MONTAJE PREVISTO | FINALIZACIÓN OFICIAL | DECO CERRADA |
 #   PRESUPUESTO DECO ACEPTADO | PEDIDOS CONFIRMADOS
 #   [opcionales idx16: ACCIÓN CONCRETA  idx17: CUÁNDO]
 def extract_master():
@@ -101,7 +101,7 @@ def extract_master():
         return []
     ws = wb[sheet]
     projects, header = [], False
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=18, values_only=True):
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=20, values_only=True):
         if not any(c for c in row): continue
         first = str(row[0] or '').strip()
         # Header row detection
@@ -136,6 +136,9 @@ def extract_master():
             # Campos opcionales — presentes si se añaden cols idx16/idx17 al Excel
             'obs':    str(row[16] or '').strip() if len(row) > 16 else '',  # ACCIÓN CONCRETA
             'cuando': str(row[17] or '').strip() if len(row) > 17 else '',  # CUÁNDO
+            # Cols 19-20 (idx 18-19): INTERVENCIÓN ALE / MOTIVO INTERVENCIÓN ALE
+            'intervencion_ale':       str(row[18] or '').strip() if len(row) > 18 else '',
+            'motivo_intervencion_ale':str(row[19] or '').strip() if len(row) > 19 else '',
             'tl': {}
         })
     return projects
@@ -312,11 +315,19 @@ if aus_sheet:
                 if not any(c for c in row):
                     continue
                 d = dict(zip(headers_aus, row))
-                estado = str(d.get('ESTADO') or '').strip()
-                if estado in ('CANCELADA', 'ADMIN_IGNORAR', 'SIN_IDENTIFICAR'):
-                    continue
+                # Bizneo: resolver NOMBRE_PILA antes de filtrar por estado
+                # Algunos registros tienen NOMBRE_PILA='SIN_IDENTIFICAR' y ESTADO='SIN_IDENTIFICAR'
+                # porque el sync no pudo mapear el nombre. Resolvemos manualmente primero.
+                _BIZNEO_MAP = {'MARIA CRISTINA FERNANDEZ NELSON': 'Cristina'}
                 nombre_pila = str(d.get('NOMBRE_PILA') or '').strip()
-                if not nombre_pila or nombre_pila in ('SIN_IDENTIFICAR', 'ADMIN_IGNORAR'):
+                if nombre_pila in ('SIN_IDENTIFICAR', ''):
+                    nombre_bizneo = str(d.get('NOMBRE_BIZNEO') or '').strip().upper()
+                    nombre_pila = _BIZNEO_MAP.get(nombre_bizneo, 'SIN_IDENTIFICAR')
+                estado = str(d.get('ESTADO') or '').strip()
+                # Descartar canceladas, ignoradas, y las que siguen sin identificar tras el mapeo
+                if estado in ('CANCELADA', 'ADMIN_IGNORAR'):
+                    continue
+                if nombre_pila in ('SIN_IDENTIFICAR', 'ADMIN_IGNORAR', ''):
                     continue
                 fecha_fin = d.get('FECHA_FIN')
                 if fecha_fin:
@@ -609,6 +620,8 @@ for p in _all_projects:
         'deco_cerrada': p.get('deco_cerrada', '—'),
         'presupuesto_deco_aceptado': p.get('presupuesto_deco_aceptado', '—'),
         'pedidos_confirmados':       p.get('pedidos_confirmados', '—'),
+        'intervencion_ale':          p.get('intervencion_ale', ''),
+        'motivo_intervencion_ale':   p.get('motivo_intervencion_ale', ''),
     })
 
 # ── GLOBAL_DATA (campos que app.js accede vía _g = globalOf(id)) ──────────────
