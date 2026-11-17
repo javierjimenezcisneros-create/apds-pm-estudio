@@ -866,12 +866,41 @@ function renderAlejandra() {
   const subLine = subParts.length ? ' · ' + subParts.join(' · ') : '';
 
   // ── Índice de navegación ─────────────────────────────────────
+  // Pre-calcular ausencias para el índice
+  const _ausAleLen = (() => {
+    const aus = (typeof AUSENCIAS_EQUIPO !== 'undefined') ? (AUSENCIAS_EQUIPO || []) : [];
+    if (!aus.length) return 0;
+    const hoyTmp = new Date(); hoyTmp.setHours(0,0,0,0);
+    const limite = new Date(hoyTmp.getTime() + 60 * 86400000);
+    const masterTmp = (typeof MASTER_DATA !== 'undefined') ? (MASTER_DATA || []) : [];
+    const proyAct = masterTmp.filter(p => {
+      if ((p.atencion||'').toUpperCase()==='PARADO') return false;
+      const eq = p.equipo;
+      if (!eq) return false;
+      return Array.isArray(eq) ? eq.length > 0 : (eq.trim() !== '' && eq !== '—');
+    });
+    return aus.filter(a => {
+      const fin = new Date(a.fin||a.inicio); fin.setHours(23,59,59,999);
+      const ini = new Date(a.inicio); ini.setHours(0,0,0,0);
+      if (fin < hoyTmp || ini > limite) return false;
+      const n = (a.persona||'').toLowerCase();
+      const proyP = proyAct.filter(p => {
+        const eq = p.equipo;
+        if (Array.isArray(eq)) return eq.some(x=>(x||'').toLowerCase().trim()===n);
+        return (eq||'').toLowerCase().split(/[/,\s]+/).some(x=>x.trim()===n);
+      });
+      const tieneAle = proyP.some(p=>(p.intervencion_ale||'').toLowerCase()==='sí'||(p.intervencion_ale||'').toLowerCase()==='si');
+      return proyP.length > 0 || tieneAle;
+    }).length;
+  })();
+
   const indiceHtml = `
     <div class="idx-nav" style="margin-bottom:20px;">
       ${conIntervencion.length ? indexBtn('ale-intervenciones', 'INTERVENCIONES',  'var(--bg2)', '#8b3a00',    conIntervencion.length) : ''}
       ${hitosDedup.length      ? indexBtn('ale-hitos',          'HITOS PRÓXIMOS',  'var(--bg2)', BORDE_PROX,   hitosDedup.length)      : ''}
       ${alertasEscaladas.length? indexBtn('ale-alertas',        '● ALERTAS · PM',  BG_ALERTA,   '#8b0000',    alertasEscaladas.length): ''}
       ${intResueltas.length    ? indexBtn('ale-resueltas',      'RESUELTAS',       'var(--bg2)', '#2a7a2a',    intResueltas.length)    : ''}
+      ${_ausAleLen             ? indexBtn('bloque-ausencias',   'AUSENCIAS',       'var(--bg2)', '#b06000',    _ausAleLen)             : ''}
     </div>`;
 
   let html = `<div class="view-head">
@@ -1007,8 +1036,12 @@ function renderAlejandra() {
     </div>`;
   }
 
+  // ── Bloque ausencias con impacto (modo Alejandra) ────────────
+  const ausHtmlAle = renderAusenciasPendientes(true);
+  if (ausHtmlAle) html += ausHtmlAle;
+
   // ── Estado vacío ──────────────────────────────────────────────
-  if (!conIntervencion.length && !hitosDedup.length && !alertasEscaladas.length && !intResueltas.length) {
+  if (!conIntervencion.length && !hitosDedup.length && !alertasEscaladas.length && !intResueltas.length && !ausHtmlAle) {
     html += `<div class="panel" style="background:var(--bg2);border-left:3px solid var(--rule);">
       <p class="panel-note" style="padding:16px 0;">Sin intervenciones ni hitos próximos registrados.</p>
     </div>`;
@@ -1227,6 +1260,228 @@ function renderCicloSemanalJavi() {
   return html;
 }
 
+/* ── AUSENCIAS — bloque compartido (Javi + Ale) ────────────── */
+// modoAle: si true, filtra solo ausencias que afectan a proyectos con intervencion_ale
+// o con hitos próximos (relevancia para la dirección)
+function renderAusenciasPendientes(modoAle) {
+  const aus = (typeof AUSENCIAS_EQUIPO !== 'undefined') ? (AUSENCIAS_EQUIPO || []) : [];
+  if (!aus.length) return '';
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const VENTANA_DIAS = 60; // mostrar ausencias en los próximos 60 días
+  const master = (typeof MASTER_DATA !== 'undefined') ? (MASTER_DATA || []) : [];
+
+  // Proyectos activos para el cruce (excluir PARADO/latente/pendiente sin equipo)
+  // p.equipo es array de strings en MASTER_DATA
+  const proyActivos = master.filter(p => {
+    const at = (p.atencion||'').toUpperCase();
+    if (at === 'PARADO') return false;
+    const eq = p.equipo;
+    if (!eq) return false;
+    if (Array.isArray(eq)) return eq.length > 0;
+    return eq.trim() !== '' && eq !== '—';
+  });
+
+  // Función para obtener proyectos de una persona por nombre en el array EQUIPO
+  // MASTER_DATA.equipo es array de strings (nombres individuales), p.ej. ["Nela","Olatz"]
+  function proyectosDe(nombre) {
+    if (!nombre) return [];
+    const n = nombre.toLowerCase().trim();
+    return proyActivos.filter(p => {
+      const eq = p.equipo;
+      if (Array.isArray(eq)) {
+        return eq.some(part => (part||'').toLowerCase().trim() === n);
+      }
+      // Fallback: string
+      return (eq||'').toLowerCase().split(/[/,\s]+/).some(part => part.trim() === n);
+    });
+  }
+
+  // Función: ¿tiene esta persona hitos relevantes durante su ausencia?
+  // Devuelve array de {proyecto, label, fecha, dias} o []
+  function hitosEnAusencia(proyPersona, iniStr, finStr) {
+    if (!proyPersona.length) return [];
+    const iniD = new Date(iniStr); iniD.setHours(0,0,0,0);
+    const finD = new Date(finStr); finD.setHours(23,59,59,999);
+    const hits = [];
+    proyPersona.forEach(p => {
+      const slots = [
+        { label: 'Fin de obra',  valor: p.fin_obra },
+        { label: 'Montaje',      valor: p.montaje  },
+        { label: 'Entrega',      valor: p.entrega  },
+        { label: p.hito||'Hito', valor: p.fecha,   },
+      ];
+      slots.forEach(sl => {
+        if (!sl.valor || sl.valor === '—') return;
+        const fd = _parseFechaMaster(sl.valor);
+        if (!fd) return;
+        fd.setHours(12,0,0,0);
+        if (fd >= iniD && fd <= finD) {
+          const diasDesdeHoy = Math.round((fd - hoy) / 86400000);
+          hits.push({ proyecto: p.nombre, label: sl.label, fecha: sl.valor, dias: diasDesdeHoy });
+        }
+      });
+    });
+    return hits;
+  }
+
+  // Agrupar filas de AUSENCIAS por persona+bloque contiguo
+  // Bizneo exporta multi-día como filas separadas; las agrupamos en periodos
+  const grupos = {};
+  aus.forEach(a => {
+    const key = a.persona;
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(a);
+  });
+
+  // Para cada persona, construir periodos consolidados
+  const periodos = [];
+  Object.keys(grupos).forEach(persona => {
+    const entradas = grupos[persona].sort((a, b) => a.inicio.localeCompare(b.inicio));
+    // Merge entradas contiguas (Bizneo exporta un registro por día)
+    const merged = [];
+    entradas.forEach(e => {
+      if (!merged.length) { merged.push({...e}); return; }
+      const last = merged[merged.length-1];
+      // Si el inicio de esta es igual o 1 día después del fin anterior, merge
+      const lastFin = new Date(last.fin || last.inicio);
+      const eIni    = new Date(e.inicio);
+      const diff    = Math.round((eIni - lastFin) / 86400000);
+      if (diff <= 1 && e.tipo === last.tipo) {
+        last.fin = e.fin || e.inicio;
+      } else {
+        merged.push({...e});
+      }
+    });
+    merged.forEach(m => {
+      const finDate = new Date(m.fin || m.inicio); finDate.setHours(23,59,59,999);
+      const iniDate = new Date(m.inicio); iniDate.setHours(0,0,0,0);
+      const limite  = new Date(hoy.getTime() + VENTANA_DIAS * 86400000);
+      // Filtrar: solo futuras o en curso dentro de la ventana
+      if (finDate < hoy) return;
+      if (iniDate > limite) return;
+      periodos.push({ persona, inicio: m.inicio, fin: m.fin||m.inicio, tipo: m.tipo, esAdmin: m.estado === 'CONFIRMADA' && grupos[persona][0] });
+    });
+  });
+
+  if (!periodos.length) return '';
+
+  // Para cada periodo: calcular proyectos afectados y clasificar impacto
+  const filas = [];
+  periodos.forEach(per => {
+    const proyPersona = proyectosDe(per.persona);
+    const hits        = hitosEnAusencia(proyPersona, per.inicio, per.fin);
+
+    // Clasificación
+    let clasif = 'SIN_IMPACTO';
+    if (hits.length > 0) {
+      // Hay hito/entrega durante la ausencia → CONFLICTO
+      clasif = 'CONFLICTO';
+    } else if (proyPersona.length > 0) {
+      // Tiene proyectos activos pero sin hito exacto en la ausencia → REVISAR
+      clasif = 'REVISAR';
+    }
+
+    // En modo Alejandra: solo mostrar si CONFLICTO, o si algún proyecto tiene intervencion_ale
+    if (modoAle) {
+      const tieneAle = proyPersona.some(p =>
+        (p.intervencion_ale||'').toLowerCase() === 'sí' ||
+        (p.intervencion_ale||'').toLowerCase() === 'si'
+      );
+      if (clasif === 'SIN_IMPACTO' && !tieneAle) return;
+    }
+
+    // Duración en días laborables (aproximado: días naturales)
+    const iniD = new Date(per.inicio);
+    const finD = new Date(per.fin);
+    const durDias = Math.max(1, Math.round((finD - iniD) / 86400000) + 1);
+
+    // Días hasta inicio
+    const diasHasta = Math.round((iniD - hoy) / 86400000);
+
+    filas.push({ ...per, proyPersona, hits, clasif, durDias, diasHasta });
+  });
+
+  // Ordenar: CONFLICTO primero, luego REVISAR, luego por fecha inicio
+  filas.sort((a, b) => {
+    const o = {CONFLICTO:0, REVISAR:1, SIN_IMPACTO:2};
+    const oc = (o[a.clasif]??2) - (o[b.clasif]??2);
+    if (oc !== 0) return oc;
+    return a.inicio.localeCompare(b.inicio);
+  });
+
+  if (!filas.length) return '';
+
+  // Helpers de formato para ausencias
+  function fmtAusDate(isoStr) {
+    if (!isoStr) return '—';
+    const [y,m,d] = isoStr.split('-');
+    const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${parseInt(d)} ${meses[parseInt(m)-1]}`;
+  }
+
+  function clasifBadge(c) {
+    if (c === 'CONFLICTO')   return `<span style="font-size:9px;font-weight:700;color:#8b0000;text-transform:uppercase;letter-spacing:.4px;">● CONFLICTO</span>`;
+    if (c === 'REVISAR')     return `<span style="font-size:9px;font-weight:700;color:#b06000;text-transform:uppercase;letter-spacing:.4px;">REVISAR</span>`;
+    return `<span style="font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px;">Sin impacto</span>`;
+  }
+
+  function hitosStr(hits) {
+    if (!hits.length) return '—';
+    return hits.map(h =>
+      `<span style="color:${h.dias<=7?'#8b0000':'#b06000'};font-size:10.5px;">${h.proyecto} · ${h.label} (${fmtAusDate(h.fecha)})</span>`
+    ).join('<br>');
+  }
+
+  const rows = filas.map(f => {
+    const rangoStr = f.inicio === f.fin
+      ? fmtAusDate(f.inicio)
+      : `${fmtAusDate(f.inicio)}–${fmtAusDate(f.fin)}`;
+    const durStr = f.durDias === 1 ? '1 día' : `${f.durDias} días`;
+    const proyStr = f.proyPersona.length
+      ? f.proyPersona.map(p => p.nombre).join(', ')
+      : '—';
+    const diasStr = f.diasHasta <= 0
+      ? `<span style="color:#c00;font-weight:600;">En curso</span>`
+      : f.diasHasta <= 7
+        ? `<span style="color:#c00;font-weight:600;">${f.diasHasta}d</span>`
+        : `<span style="color:var(--ink2);">${f.diasHasta}d</span>`;
+    return `<tr style="border-top:1px solid var(--rule);">
+      <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;vertical-align:top;">${f.persona}</td>
+      <td style="padding:6px 4px;font-size:11px;color:var(--ink3);vertical-align:top;">${rangoStr}<br><span style="font-size:10px;">${durStr}</span></td>
+      <td style="padding:6px 4px;vertical-align:top;">${diasStr}</td>
+      <td style="padding:6px 4px;vertical-align:top;">${clasifBadge(f.clasif)}</td>
+      <td style="padding:6px 4px;font-size:10.5px;color:var(--ink2);vertical-align:top;">${hitosStr(f.hits)}</td>
+      <td style="padding:6px 0 6px 4px;font-size:10px;color:var(--ink3);vertical-align:top;">${modoAle ? '' : f.proyPersona.length + ' proy.'}<br style="${modoAle?'display:none':''}"><span style="font-size:9.5px;${modoAle?'display:none':''}">${proyStr.length > 60 ? proyStr.slice(0,57)+'…' : proyStr}</span></td>
+    </tr>`;
+  });
+
+  const tituloBloque = modoAle ? 'AUSENCIAS CON IMPACTO' : 'PRÓXIMAS AUSENCIAS Y COBERTURAS';
+  const conflictos = filas.filter(f => f.clasif === 'CONFLICTO').length;
+  const revisar    = filas.filter(f => f.clasif === 'REVISAR').length;
+  const subNote = [
+    conflictos ? `${conflictos} conflicto${conflictos!==1?'s':''}` : '',
+    revisar    ? `${revisar} a revisar` : '',
+  ].filter(Boolean).join(' · ') || `${filas.length} próxima${filas.length!==1?'s':''}`;
+
+  const colsHead = modoAle
+    ? `<th style="width:14%;">Persona</th><th style="width:16%;">Periodo</th><th style="width:9%;">Faltan</th><th style="width:14%;">Impacto</th><th style="width:47%;">Entregas/hitos durante ausencia</th>`
+    : `<th style="width:12%;">Persona</th><th style="width:14%;">Periodo</th><th style="width:8%;">Faltan</th><th style="width:12%;">Impacto</th><th style="width:30%;">Hitos durante ausencia</th><th style="width:24%;">Proyectos asignados</th>`;
+
+  const bordColor = conflictos > 0 ? '#8b0000' : '#b06000';
+
+  return `<div id="bloque-ausencias" class="panel" style="background:var(--bg2);border-left:3px solid ${bordColor};">
+    <div class="panel-head">
+      <span class="eyebrow" style="color:${bordColor};">${tituloBloque}</span>
+      <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${subNote} · próximos 60 días</span>
+    </div>
+    <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+      <thead><tr>${colsHead}</tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+
 /* ── Render Javi — CENTRO DE CONTROL ──────────────────────── */
 function renderJavi() {
   const todos = (MASTER_DATA||[]).map(enrich);
@@ -1241,9 +1496,22 @@ function renderJavi() {
 
   GRUPOS.forEach(g => { g.projs = todos.filter(p => atLevel(p) === g.level); });
 
+  // Pre-calcular si habrá bloque de ausencias para el índice
+  const _ausJaviLen = (() => {
+    const aus = (typeof AUSENCIAS_EQUIPO !== 'undefined') ? (AUSENCIAS_EQUIPO || []) : [];
+    const hoyTmp = new Date(); hoyTmp.setHours(0,0,0,0);
+    const limite = new Date(hoyTmp.getTime() + 60 * 86400000);
+    return aus.filter(a => {
+      const fin = new Date(a.fin||a.inicio); fin.setHours(23,59,59,999);
+      const ini = new Date(a.inicio); ini.setHours(0,0,0,0);
+      return fin >= hoyTmp && ini <= limite;
+    }).length;
+  })();
+
   const indiceHtml = `
     <div class="idx-nav" style="margin-bottom:20px;">
       ${GRUPOS.map(g => indexBtn(g.id, g.label, g.bg, g.borde, g.projs.length)).join('')}
+      ${_ausJaviLen ? indexBtn('bloque-ausencias', 'AUSENCIAS', 'var(--bg2)', '#b06000', _ausJaviLen) : ''}
     </div>`;
 
   let html = `<div class="view-head">
@@ -1266,6 +1534,10 @@ function renderJavi() {
       ${g.projs.map(p => projCard(p, {gantt: g.withGantt})).join('')}
     </div>`;
   });
+
+  /* Bloque de ausencias — al final del centro de control */
+  const ausHtml = renderAusenciasPendientes(false);
+  if (ausHtml) html += ausHtml;
 
   document.getElementById('view').innerHTML = html;
 }
