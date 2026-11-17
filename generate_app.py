@@ -715,8 +715,9 @@ try:
 except Exception:
     _excel_fecha = hoy
 
+_MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 META = {
-    'updated':    _excel_fecha.strftime('%d %b %Y'),
+    'updated':    f"{_excel_fecha.day} {_MESES_ES[_excel_fecha.month-1]} {_excel_fecha.year}",
     'hoy_semana': HOY_SEMANA_LABEL,
 }
 
