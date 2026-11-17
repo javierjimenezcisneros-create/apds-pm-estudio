@@ -101,7 +101,7 @@ def extract_master():
         return []
     ws = wb[sheet]
     projects, header = [], False
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=18, values_only=True):
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=20, values_only=True):
         if not any(c for c in row): continue
         first = str(row[0] or '').strip()
         # Header row detection
@@ -612,6 +612,9 @@ for p in _all_projects:
         'deco_cerrada': p.get('deco_cerrada', '—'),
         'presupuesto_deco_aceptado': p.get('presupuesto_deco_aceptado', '—'),
         'pedidos_confirmados':       p.get('pedidos_confirmados', '—'),
+        # Cols 18-19: presencia y motivo intervención Alejandra
+        'intervencion_ale': p.get('intervencion_ale', ''),
+        'motivo_ale':       p.get('motivo_ale', ''),
     })
 
 # ── GLOBAL_DATA (campos que app.js accede vía _g = globalOf(id)) ──────────────

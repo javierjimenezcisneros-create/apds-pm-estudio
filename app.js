@@ -726,79 +726,231 @@ function indexBtn(id, label, bg, borde, count) {
 }
 
 /* ── Render Alejandra — DIRECCIÓN ─────────────────────────── */
+/* ── Parser de fechas del Master (texto libre) ───────────────────────────────
+   Acepta: 'Nov 2026', '3 dic 2026', '20 ene 2027', '~20 nov 2026',
+           'Fin nov 2026', 'Nov/Dic 2026' (usa el primer mes), 'Sem Santa 2027' → null,
+           'Dic'26' (formato antiguo), '3 oct'26'.
+   Devuelve Date con hora 00:00 o null si no parseable / muy vago.
+   Para meses sin día concreto devuelve el día 1.                            */
+function _parseFechaMaster(str) {
+  if (!str || str === '—' || str === '' ) return null;
+  const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11,
+                 jan:0,feb:1,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const s = str.replace(/[~*]/g,'').trim().toLowerCase();
+  // "3 dic 2026" / "20 ene 2027"
+  let m = s.match(/(\d{1,2})\s+([a-záéíóú]{3})\s+(20\d{2})/);
+  if (m) { const mes=MESES[m[2]]; if(mes!==undefined) return new Date(+m[3],mes,+m[1]); }
+  // "dic 2026" / "nov 2026" (mes año)
+  m = s.match(/([a-záéíóú]{3})\s+(20\d{2})/);
+  if (m) { const mes=MESES[m[1]]; if(mes!==undefined) return new Date(+m[2],mes,1); }
+  // "nov/dic 2026" → usa primer mes
+  m = s.match(/([a-záéíóú]{3})\/[a-záéíóú]{3}\s+(20\d{2})/);
+  if (m) { const mes=MESES[m[1]]; if(mes!==undefined) return new Date(+m[2],mes,1); }
+  // "3 oct'26" / "dic'26"
+  m = s.match(/(\d{1,2})\s+([a-záéíóú]{3})'(\d{2})/);
+  if (m) { const mes=MESES[m[2]]; if(mes!==undefined) return new Date(2000+parseInt(m[3]),mes,+m[1]); }
+  m = s.match(/([a-záéíóú]{3})'(\d{2})/);
+  if (m) { const mes=MESES[m[1]]; if(mes!==undefined) return new Date(2000+parseInt(m[2]),mes,1); }
+  return null;
+}
+
+/* Días que faltan desde hoy hasta una fecha del Master (texto libre).
+   Devuelve número (puede ser negativo = ya pasó) o null si no parseable. */
+function _diasHastaMaster(str) {
+  const d = _parseFechaMaster(str);
+  if (!d) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  return Math.round((d - hoy) / 86400000);
+}
+
+/* Texto corto para mostrar fecha del Master */
+function _fmtMaster(str) {
+  if (!str || str === '—') return '—';
+  // Limpiar prefijos como "~", "Fin ", "Sem Santa..."
+  return str.replace(/^~/,'').trim();
+}
+
 function renderAlejandra() {
-  // Panel mixto: estado operativo del Excel (siempre visible) +
-  // intervenciones específicas escaladas por el PM (cuando publicadas).
-  const todos = (MASTER_DATA||[]).map(enrich);
-  const sem   = hoySemana();
+  // Pantalla de dirección: combina datos del Excel (MASTER_DATA) con JSON de intervenciones.
+  // ── Bloque 1: INTERVENCIONES PENDIENTES — proyectos con intervencion_ale === 'Sí' (Excel)
+  // ── Bloque 2: HITOS PRÓXIMOS — entregas/fin_obra/montaje en los próximos 21 días (Excel)
+  // ── Bloque 3: ALERTAS PARA ALEJANDRA — JSON escalado por PM (decisiones/aprobaciones urgentes)
+  // ── Bloque 4: RESUELTAS — JSON resueltas con decisión adoptada
+  const sem = hoySemana();
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const VENTANA_HITOS = 21; // días
 
   // ── Datos del Excel ──────────────────────────────────────────
-  const alerta   = todos.filter(p => atLevel(p) === 0);
-  const atencion = todos.filter(p => atLevel(p) === 1);
+  const master = (typeof MASTER_DATA !== 'undefined') ? (MASTER_DATA || []) : [];
 
-  const estaSemanaAlert  = todos.filter(p => atLevel(p) <= 1 && projHasActivityThisWeek(p));
-  const estaSemanaNormal = todos.filter(p => atLevel(p) > 1  && projHasActivityThisWeek(p));
-  const estaSemana = [...estaSemanaAlert, ...estaSemanaNormal];
+  // Bloque 1: proyectos con intervención explícita de Alejandra marcada en el Excel
+  const conIntervencion = master.filter(p =>
+    (p.intervencion_ale || '').toLowerCase() === 'sí' ||
+    (p.intervencion_ale || '').toLowerCase() === 'si'
+  ).sort((a, b) => {
+    // Ordenar: ALERTA primero, luego ATENCIÓN ALTA, luego resto
+    const ord = {'ALERTA':0,'ATENCIÓN ALTA':1,'ATENCIÓN MAXIMA':0};
+    const oa = ord[(a.atencion||'').toUpperCase()] ?? 2;
+    const ob = ord[(b.atencion||'').toUpperCase()] ?? 2;
+    return oa - ob;
+  });
 
-  const proximamente = todos
-    .filter(p => projHasActivityInWindow(p, 1, 3))
-    .sort((a,b) => {
-      const da = a._g?.fecha_hito||'', db = b._g?.fecha_hito||'';
-      return da < db ? -1 : da > db ? 1 : 0;
+  // Bloque 2: hitos próximos — cualquier proyecto con fecha relevante en los próximos 21 días
+  // No requiere intervencion_ale. Excluye proyectos PARADO.
+  const hitosProximos = [];
+  master.forEach(p => {
+    if ((p.atencion||'').toUpperCase() === 'PARADO') return;
+    const slots = [
+      { label: 'Fin de obra',         valor: p.fin_obra  },
+      { label: 'Montaje',             valor: p.montaje   },
+      { label: 'Finalización oficial',valor: p.entrega   },
+      { label: p.hito || 'Hito',      valor: p.fecha,    esPrincHito: true },
+    ];
+    slots.forEach(sl => {
+      if (!sl.valor || sl.valor === '—' || sl.valor === '') return;
+      const dias = _diasHastaMaster(sl.valor);
+      if (dias === null) return;
+      if (dias >= 0 && dias <= VENTANA_HITOS) {
+        hitosProximos.push({
+          nombre: p.nombre, dept: p.dept, atencion: p.atencion,
+          label: sl.label, valor: sl.valor, dias,
+          intervencion_ale: p.intervencion_ale
+        });
+      }
     });
+  });
+  // Ordenar por días restantes, luego nombre
+  hitosProximos.sort((a, b) => a.dias - b.dias || a.nombre.localeCompare(b.nombre));
+  // Deduplicar: si un proyecto aparece varias veces el mismo día, agrupar (misma fecha/proyecto)
+  const hitosKey = new Set();
+  const hitosDedup = hitosProximos.filter(h => {
+    const k = `${h.nombre}|${h.dias}|${h.label}`;
+    if (hitosKey.has(k)) return false;
+    hitosKey.add(k); return true;
+  });
 
-  // ── Intervenciones escaladas (JSON) ─────────────────────────
+  // ── Datos del JSON (escalado por PM) ─────────────────────────
   const int_d = (typeof INTERVENCIONES_DIR !== 'undefined') ? INTERVENCIONES_DIR : null;
-  const intervenciones = (int_d && int_d.intervenciones) ? int_d.intervenciones : [];
+  const obj   = (typeof OBJETIVOS_SEMANA   !== 'undefined') ? OBJETIVOS_SEMANA   : null;
 
-  const urgentes = intervenciones.filter(i => {
+  const intPublicado = int_d && int_d.estado_publicacion === 'Publicado';
+  const objPublicado = obj  && obj.estado_publicacion    === 'Publicado';
+  const cicloValido  = intPublicado && objPublicado && (obj.semana === sem);
+
+  // Bloque 3: alertas escaladas por PM (JSON) — solo si ciclo publicado
+  const todasJSON = cicloValido
+    ? (int_d.intervenciones || []).filter(i => i.escalado_por === 'PM')
+    : [];
+
+  const alertasEscaladas = todasJSON.filter(i => {
     if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
-    const d = diasRestantes(i.fecha_limite);
-    return d !== null && d <= 5;
+    return true;
   }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
 
-  const intProximas = intervenciones.filter(i => {
-    if (i.estado === 'Resuelta' || i.estado === 'Descartada') return false;
-    const d = diasRestantes(i.fecha_limite);
-    return d !== null && d >= 6 && d <= 14;
-  }).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
-
-  const reuniones = intervenciones.filter(i =>
-    i.tipo === 'Reunión' && i.estado !== 'Resuelta' && i.estado !== 'Descartada'
-  ).sort((a,b) => (a.fecha_limite||'').localeCompare(b.fecha_limite||''));
-
-  const intResueltas = intervenciones
+  // Bloque 4: resueltas recientemente (JSON)
+  const intResueltas = todasJSON
     .filter(i => i.estado === 'Resuelta' && i.decision_adoptada)
     .sort((a,b) => (b.fecha_resolucion||'').localeCompare(a.fecha_resolucion||''))
     .slice(0, 7);
 
-  const hayIntervenciones = urgentes.length || intProximas.length || reuniones.length || intResueltas.length;
-  const totalInt = urgentes.length + intProximas.length;
+  // ── Recuento para cabecera ───────────────────────────────────
+  const totalPendExcel = conIntervencion.length;
+  const totalHitos     = hitosDedup.length;
+  const totalAlertas   = alertasEscaladas.length;
+
+  // ── Cabecera ─────────────────────────────────────────────────
+  const subParts = [];
+  if (totalPendExcel) subParts.push(`${totalPendExcel} intervención${totalPendExcel!==1?'es':''}`);
+  if (totalHitos)     subParts.push(`${totalHitos} hito${totalHitos!==1?'s':''} próximo${totalHitos!==1?'s':''}`);
+  if (totalAlertas)   subParts.push(`${totalAlertas} alerta${totalAlertas!==1?'s':''} PM`);
+  const subLine = subParts.length ? ' · ' + subParts.join(' · ') : '';
 
   // ── Índice de navegación ─────────────────────────────────────
   const indiceHtml = `
     <div class="idx-nav" style="margin-bottom:20px;">
-      ${urgentes.length    ? indexBtn('ale-int-urgentes',  '● DECISIÓN URGENTE',  BG_ALERTA,    '#8b0000',     urgentes.length)    : ''}
-      ${alerta.length      ? indexBtn('ale-alerta',        '● ALERTA',            BG_ALERTA,    BORDE_ALERTA,  alerta.length)      : ''}
-      ${atencion.length    ? indexBtn('ale-atencion',      '● ATENCIÓN',          BG_ATENCION,  BORDE_ATENCION,atencion.length)    : ''}
-      ${estaSemana.length  ? indexBtn('ale-semana',        'ESTA SEMANA',         BG_SEMANA,    BORDE_SEMANA,  estaSemana.length)  : ''}
-      ${proximamente.length? indexBtn('ale-prox',          'PRÓXIMAMENTE',        BG_PROX,      BORDE_PROX,    proximamente.length): ''}
-      ${intProximas.length ? indexBtn('ale-int-proximas',  'INT. PRÓXIMAS',       BG_PROX,      BORDE_PROX,    intProximas.length) : ''}
+      ${conIntervencion.length ? indexBtn('ale-intervenciones', 'INTERVENCIONES',  'var(--bg2)', '#8b3a00',    conIntervencion.length) : ''}
+      ${hitosDedup.length      ? indexBtn('ale-hitos',          'HITOS PRÓXIMOS',  'var(--bg2)', BORDE_PROX,   hitosDedup.length)      : ''}
+      ${alertasEscaladas.length? indexBtn('ale-alertas',        '● ALERTAS · PM',  BG_ALERTA,   '#8b0000',    alertasEscaladas.length): ''}
+      ${intResueltas.length    ? indexBtn('ale-resueltas',      'RESUELTAS',       'var(--bg2)', '#2a7a2a',    intResueltas.length)    : ''}
     </div>`;
 
-  const subLine = totalInt
-    ? ` · ${totalInt} intervención${totalInt!==1?'es':''} pendiente${totalInt!==1?'s':''}`
-    : '';
   let html = `<div class="view-head">
     <div>
       <div class="view-title">DIRECCIÓN</div>
-      <div class="view-sub">${sem} · ${todos.length} proyectos${subLine}</div>
+      <div class="view-sub">${sem}${subLine}</div>
     </div>
   </div>
   ${indiceHtml}`;
 
-  // ── Bloque 1: Decisiones urgentes (intervenciones ≤5 días) ──
-  if (urgentes.length) {
+  // ── Bloque 1: Intervenciones pendientes (Excel) ──────────────
+  if (conIntervencion.length) {
+    function aleAtTag(a) {
+      const v = (a||'').toUpperCase();
+      if (v === 'ALERTA' || v === 'ATENCIÓN MAXIMA')
+        return `<span style="font-size:9px;font-weight:700;color:#8b0000;text-transform:uppercase;letter-spacing:.5px;">● ${a}</span>`;
+      if (v === 'ATENCIÓN ALTA')
+        return `<span style="font-size:9px;font-weight:700;color:#b06000;text-transform:uppercase;letter-spacing:.5px;">${a}</span>`;
+      return `<span style="font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">${a}</span>`;
+    }
+    html += `<div id="ale-intervenciones" class="panel" style="background:var(--bg2);border-left:3px solid #8b3a00;">
+      <div class="panel-head">
+        <span class="eyebrow" style="color:#8b3a00;">INTERVENCIONES PENDIENTES</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${conIntervencion.length} proyecto${conIntervencion.length!==1?'s':''} · marcados en el Master</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:22%;">Proyecto</th>
+          <th style="width:12%;">Estado</th>
+          <th style="width:54%;">Por qué interviene Alejandra</th>
+          <th style="width:12%;">Próx. hito</th>
+        </tr></thead>
+        <tbody>${conIntervencion.map(p => `<tr style="border-top:1px solid var(--rule);">
+          <td style="padding:7px 4px 7px 0;font-size:12px;font-weight:500;vertical-align:top;">${p.nombre||'—'}<br>
+            <span style="font-size:10px;color:var(--ink3);font-weight:400;">${p.dept||''}</span></td>
+          <td style="padding:7px 4px;vertical-align:top;">${aleAtTag(p.atencion)}</td>
+          <td style="padding:7px 4px;font-size:11.5px;color:var(--ink2);vertical-align:top;">${p.motivo_ale||p.hito||'—'}</td>
+          <td style="padding:7px 0 7px 4px;font-size:11px;color:var(--ink3);vertical-align:top;">${_fmtMaster(p.fecha)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── Bloque 2: Hitos próximos (≤21 días, Excel) ───────────────
+  if (hitosDedup.length) {
+    function hitoDiasStr(dias) {
+      if (dias === 0) return `<span style="color:#c00;font-weight:600;">hoy</span>`;
+      if (dias === 1) return `<span style="color:#c00;font-weight:600;">mañana</span>`;
+      if (dias <= 5)  return `<span style="color:#c00;font-weight:600;">${dias}d</span>`;
+      if (dias <= 10) return `<span style="color:#b06000;font-weight:600;">${dias}d</span>`;
+      return `<span style="color:var(--ink2);">${dias}d</span>`;
+    }
+    html += `<div id="ale-hitos" class="panel" style="background:var(--bg2);border-left:3px solid ${BORDE_PROX};">
+      <div class="panel-head">
+        <span class="eyebrow">HITOS PRÓXIMOS</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">próximos 21 días · ${hitosDedup.length}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:24%;">Proyecto</th>
+          <th style="width:20%;">Hito</th>
+          <th style="width:28%;">Fecha prevista</th>
+          <th style="width:14%;">Faltan</th>
+          <th style="width:14%;">Tu presencia</th>
+        </tr></thead>
+        <tbody>${hitosDedup.map(h => `<tr style="border-top:1px solid var(--rule);">
+          <td style="padding:5px 4px 5px 0;font-size:12px;font-weight:500;vertical-align:top;">${h.nombre||'—'}<br>
+            <span style="font-size:10px;color:var(--ink3);font-weight:400;">${h.dept||''}</span></td>
+          <td style="padding:5px 4px;font-size:11px;color:var(--ink2);vertical-align:top;">${h.label}</td>
+          <td style="padding:5px 4px;font-size:11.5px;vertical-align:top;">${_fmtMaster(h.valor)}</td>
+          <td style="padding:5px 4px;vertical-align:top;">${hitoDiasStr(h.dias)}</td>
+          <td style="padding:5px 0 5px 4px;font-size:10px;vertical-align:top;">${(h.intervencion_ale||'').toLowerCase()==='sí'||h.intervencion_ale==='si'?'<span style="color:#8b3a00;font-weight:600;">Requerida</span>':'<span style="color:var(--ink3);">—</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── Bloque 3: Alertas escaladas por PM (JSON) ─────────────────
+  if (alertasEscaladas.length) {
     function intRowAle(i) {
       const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
       const dias = diasRestantes(i.fecha_limite);
@@ -808,7 +960,7 @@ function renderAlejandra() {
         : dias <= 2 ? `<span style="color:#c00;font-weight:600;">${dias}d</span>`
         : `${dias}d`;
       return `<tr style="border-top:1px solid var(--rule);">
-        <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;">${i.proyecto||'—'}<br>
+        <td style="padding:6px 4px 6px 0;font-size:12px;font-weight:500;vertical-align:top;">${i.proyecto||'—'}<br>
           <span style="font-size:10px;color:var(--ink3);font-weight:400;">${i.departamento||''}</span></td>
         <td style="padding:6px 4px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
         <td style="padding:6px 4px;font-size:11.5px;color:var(--ink2);vertical-align:top;">${i.accion_concreta||'—'}</td>
@@ -816,10 +968,10 @@ function renderAlejandra() {
         <td style="padding:6px 0 6px 4px;font-size:11px;white-space:nowrap;vertical-align:top;">${fmtFecha(i.fecha_limite)}<br><span style="font-size:10px;">(${diasStr})</span></td>
       </tr>`;
     }
-    html += `<div id="ale-int-urgentes" class="panel" style="background:${BG_ALERTA};border-left:3px solid #8b0000;">
+    html += `<div id="ale-alertas" class="panel" style="background:${BG_ALERTA};border-left:3px solid #8b0000;">
       <div class="panel-head">
-        <span class="eyebrow" style="color:#8b0000;">● DECISIONES URGENTES · JAVIER ESCALA</span>
-        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">límite ≤ 5 días · ${urgentes.length}</span>
+        <span class="eyebrow" style="color:#8b0000;">● ALERTAS · JAVIER ESCALA</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${alertasEscaladas.length} · ciclo ${sem}</span>
       </div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
         <thead><tr>
@@ -827,112 +979,21 @@ function renderAlejandra() {
           <th style="width:31%;">Qué se necesita</th><th style="width:28%;">Impacto si no actúas</th>
           <th style="width:12%;">Límite</th>
         </tr></thead>
-        <tbody>${urgentes.map(intRowAle).join('')}</tbody>
+        <tbody>${alertasEscaladas.map(intRowAle).join('')}</tbody>
       </table></div>
     </div>`;
-  }
-
-  // ── Bloque 2: Alerta (Excel) ─────────────────────────────────
-  html += `<div id="ale-alerta" class="panel" style="background:${BG_ALERTA};border-left:3px solid ${BORDE_ALERTA};">
-    <div class="panel-head">${tagHtml('tag-crit','● ALERTA')}&ensp;<span style="font-weight:300;color:var(--ink3);">${alerta.length}</span></div>
-    ${alerta.length ? alerta.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en alerta.</p>'}
-  </div>`;
-
-  // ── Bloque 3: Atención (Excel) ───────────────────────────────
-  html += `<div id="ale-atencion" class="panel" style="background:${BG_ATENCION};border-left:3px solid ${BORDE_ATENCION};">
-    <div class="panel-head">${tagHtml('tag-alto','● ATENCIÓN')}&ensp;<span style="font-weight:300;color:var(--ink3);">${atencion.length}</span></div>
-    ${atencion.length ? atencion.map(p => projCard(p,{gantt:true})).join('') : '<p class="panel-note">Sin proyectos en atención.</p>'}
-  </div>`;
-
-  // ── Bloque 4: Esta semana (Excel) ────────────────────────────
-  if (estaSemana.length) {
-    html += `<div id="ale-semana" class="panel" style="background:${BG_SEMANA};border-left:3px solid ${BORDE_SEMANA};">
-      <div class="panel-head"><span class="eyebrow">ESTA SEMANA</span> <span style="font-size:11px;color:var(--ink3);font-weight:300;">${sem}</span></div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Actividad</th><th>Próximo hito</th><th>Fecha</th></tr></thead>
-        <tbody>
-          ${estaSemana.map(p => {
-            const entry = (p._p?.timeline||[]).find(t => t.semana === sem);
-            const act   = (entry?.actividades||[]).map(a=>a.texto).join(', ') || '—';
-            return `<tr style="cursor:pointer;" data-open="${p.id}">
-              <td><strong>${p.nombre}</strong></td>
-              <td>${tagHtml(...deptTag(p.dpto))}</td>
-              <td style="color:var(--ink2);">${act}</td>
-              <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
-              <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table></div>
+  } else if (cicloValido) {
+    // Ciclo publicado pero sin alertas escaladas esta semana
+    html += `<div id="ale-alertas" class="panel" style="background:var(--bg2);border-left:3px solid var(--rule);">
+      <div class="panel-head"><span class="eyebrow">ALERTAS · JAVIER ESCALA</span></div>
+      <p class="panel-note" style="padding:10px 0;">Sin alertas escaladas esta semana.</p>
     </div>`;
   }
+  // Si no hay ciclo válido, no se muestra el bloque de alertas JSON (no hay nada que mostrar).
 
-  // ── Bloque 5: Próximamente (Excel) ───────────────────────────
-  if (proximamente.length) {
-    html += `<div id="ale-prox" class="panel" style="background:${BG_PROX};border-left:3px solid ${BORDE_PROX};">
-      <div class="panel-head"><span class="eyebrow">PRÓXIMAMENTE</span></div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Proyecto</th><th>Dpto</th><th>Hito</th><th>Fecha</th></tr></thead>
-        <tbody>
-          ${proximamente.map(p => `<tr style="cursor:pointer;" data-open="${p.id}">
-            <td><strong>${p.nombre}</strong></td>
-            <td>${tagHtml(...deptTag(p.dpto))}</td>
-            <td style="color:var(--ink2);">${p._g?.proximo_hito||'—'}</td>
-            <td style="color:var(--cop);">${p._g?.fecha_hito||'—'}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
-  }
-
-  // ── Bloque 6: Próximas intervenciones escaladas (6–14 días) ──
-  if (intProximas.length) {
-    html += `<div id="ale-int-proximas" class="panel" style="background:var(--bg2);border-left:3px solid ${BORDE_PROX};">
-      <div class="panel-head">
-        <span class="eyebrow">PRÓXIMAS INTERVENCIONES · JAVIER ESCALA</span>
-        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">6–14 días · ${intProximas.length}</span>
-      </div>
-      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr>
-          <th style="width:20%;">Proyecto</th><th style="width:12%;">Tipo</th>
-          <th style="width:38%;">Qué se necesita</th><th style="width:30%;">Impacto</th>
-        </tr></thead>
-        <tbody>${intProximas.map(i => {
-          const tipoColor = {Decisión:'#c00',Aprobación:'#b06000',Reunión:'#005f9e',Negociación:'#600060',Supervisión:'#444'}[i.tipo]||'#444';
-          const dias = diasRestantes(i.fecha_limite);
-          const diasStr = dias === null ? '—' : `${dias}d (${fmtFecha(i.fecha_limite)})`;
-          return `<tr style="border-top:1px solid var(--rule);">
-            <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
-            <td style="padding:5px 4px;"><span style="font-size:10px;font-weight:600;color:${tipoColor};">${i.tipo||'—'}</span></td>
-            <td style="padding:5px 4px;font-size:11.5px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
-            <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${diasStr}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>`;
-  }
-
-  // ── Bloque 7: Reuniones con presencia ────────────────────────
-  if (reuniones.length) {
-    html += `<div id="ale-int-reuniones" class="panel" style="background:var(--bg2);border-left:3px solid ${BORDE_SEMANA};">
-      <div class="panel-head">
-        <span class="eyebrow">REUNIONES CON TU PRESENCIA</span>
-        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${reuniones.length}</span>
-      </div>
-      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
-        <thead><tr><th>Proyecto</th><th>Acción requerida</th><th>Límite</th></tr></thead>
-        <tbody>${reuniones.map(i => `<tr style="border-top:1px solid var(--rule);">
-          <td style="padding:5px 4px 5px 0;font-size:12px;">${i.proyecto||'—'}</td>
-          <td style="padding:5px 4px;font-size:11.5px;color:var(--ink2);">${i.accion_concreta||'—'}</td>
-          <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--cop);">${fmtFecha(i.fecha_limite)}</td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-    </div>`;
-  }
-
-  // ── Bloque 8: Resueltas recientemente ────────────────────────
+  // ── Bloque 4: Resueltas recientemente (JSON) ──────────────────
   if (intResueltas.length) {
-    html += `<div id="ale-int-resueltas" class="panel" style="background:var(--bg2);border-left:3px solid #2a7a2a;">
+    html += `<div id="ale-resueltas" class="panel" style="background:var(--bg2);border-left:3px solid #2a7a2a;">
       <div class="panel-head"><span class="eyebrow" style="color:#2a7a2a;">RESUELTAS RECIENTEMENTE</span></div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
         <thead><tr><th>Proyecto</th><th>Decisión adoptada</th><th>Ejecuta</th><th>Fecha</th></tr></thead>
@@ -943,6 +1004,13 @@ function renderAlejandra() {
           <td style="padding:5px 0 5px 4px;font-size:11px;color:var(--ink3);">${fmtFecha(i.fecha_resolucion)}</td>
         </tr>`).join('')}</tbody>
       </table></div>
+    </div>`;
+  }
+
+  // ── Estado vacío ──────────────────────────────────────────────
+  if (!conIntervencion.length && !hitosDedup.length && !alertasEscaladas.length && !intResueltas.length) {
+    html += `<div class="panel" style="background:var(--bg2);border-left:3px solid var(--rule);">
+      <p class="panel-note" style="padding:16px 0;">Sin intervenciones ni hitos próximos registrados.</p>
     </div>`;
   }
 
