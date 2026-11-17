@@ -1696,11 +1696,17 @@ function init() {
   wireEvents();
   activateTab('alejandra');  // Alejandra es la pestaña inicial
 
+  // week-badge → fecha actual del sistema (dinámica, calculada en el cliente)
   const wb = document.getElementById('week-badge');
-  if (wb) wb.textContent = hoySemana();
+  if (wb) {
+    const ahora = new Date();
+    const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    wb.textContent = `Hoy: ${ahora.getDate()} ${meses[ahora.getMonth()]} ${ahora.getFullYear()}`;
+  }
 
+  // update-badge → fecha de modificación del Excel (estática, viene de META)
   const ub = document.getElementById('update-badge');
-  if (ub && META?.updated) ub.textContent = 'Act. ' + META.updated;
+  if (ub && META?.updated) ub.textContent = 'Datos: ' + META.updated;
 }
 
 document.addEventListener('DOMContentLoaded', init);
