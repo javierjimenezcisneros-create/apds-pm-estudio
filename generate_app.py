@@ -139,6 +139,8 @@ def extract_master():
             # Cols 18-19: presencia y motivo intervención Alejandra
             'intervencion_ale': str(row[18] or '').strip() if len(row) > 18 else '',
             'motivo_ale':       str(row[19] or '').strip() if len(row) > 19 else '',
+            # Col 20: visualización / renders
+            'visualizacion':    str(row[20] or '').strip() if len(row) > 20 else '',
             'tl': {}
         })
     return projects
@@ -292,6 +294,30 @@ if not ALE_ALERTAS:
         for p in MASTER if p['nivel'] in ('ATENCIÓN MÁXIMA','ATENCIÓN ALTA')]
 
 print(f"Resumen Alejandra: {len(ALE_ALERTAS)} alertas, {len(ALE_HITOS)} hitos")
+
+# ── ALE_URGENTE: proyectos con ATENCIÓN MÁXIMA/ALTA sin intervencion_ale explícita ──
+# (urgencia por estado del proyecto, no por necesidad de sesión con Ale)
+_ale_con_interv = {p['nombre'] for p in MASTER
+                   if p.get('intervencion_ale','').lower() in ('sí','si')}
+ALE_URGENTE = [
+    {'nombre': p['nombre'], 'dept': p['dept'], 'nivel': p['nivel'],
+     'hito': p['hito'], 'fecha': str(p['fecha']), 'bloqueador': p['bloqueador'],
+     'resp': p['resp']}
+    for p in MASTER
+    if p['nivel'] in ('ATENCIÓN MÁXIMA', 'ATENCIÓN ALTA')
+    and p['nombre'] not in _ale_con_interv
+]
+print(f"  ALE_URGENTE: {len(ALE_URGENTE)} proyectos urgentes sin sesión explícita")
+
+# ── VISUALIZACION_DATA: proyectos con necesidad de renders o 3D ──────────────
+VISUALIZACION_DATA = [
+    {'nombre': p['nombre'], 'dept': p['dept'], 'estado': p['estado'],
+     'visualizacion': p.get('visualizacion',''), 'hito': p['hito'],
+     'fecha': str(p['fecha']), 'resp': p['resp']}
+    for p in MASTER
+    if p.get('visualizacion','').strip() not in ('', '—')
+]
+print(f"  VISUALIZACION_DATA: {len(VISUALIZACION_DATA)} proyectos con visualización asignada")
 
 # ── AUSENCIAS BIZNEO ─────────────────────────────────────────────────────────
 AUSENCIAS_EQUIPO   = []   # todas las ausencias activas/futuras identificadas
@@ -615,6 +641,8 @@ for p in _all_projects:
         # Cols 18-19: presencia y motivo intervención Alejandra
         'intervencion_ale': p.get('intervencion_ale', ''),
         'motivo_ale':       p.get('motivo_ale', ''),
+        # Col 20: visualización / renders
+        'visualizacion':    p.get('visualizacion', ''),
     })
 
 # ── GLOBAL_DATA (campos que app.js accede vía _g = globalOf(id)) ──────────────
@@ -798,7 +826,9 @@ const ALERTAS = {json.dumps(ALERTAS_JSON, ensure_ascii=False)};
 const AGENDA = {json.dumps(AGENDA, ensure_ascii=False)};
 const MONTAJES = {json.dumps(MONTAJES, ensure_ascii=False)};
 const ALE_ALERTAS = {json.dumps(ALE_ALERTAS, ensure_ascii=False)};
+const ALE_URGENTE = {json.dumps(ALE_URGENTE, ensure_ascii=False)};
 const ALE_HITOS = {json.dumps(ALE_HITOS, ensure_ascii=False)};
+const VISUALIZACION_DATA = {json.dumps(VISUALIZACION_DATA, ensure_ascii=False)};
 const ALE_MONTAJES = {json.dumps(ALE_MONTAJES, ensure_ascii=False)};
 const ALE_PRESENCIA = {json.dumps(ALE_PRESENCIA, ensure_ascii=False)};
 const ALE_PROXIMAS = {json.dumps(ALE_PROXIMAS, ensure_ascii=False)};

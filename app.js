@@ -652,6 +652,8 @@ function buildTabs() {
             style="font-weight:600;">ALEJANDRA · DIRECCIÓN</button>`;
   html += `<button class="tab tab-master${curTab==='javi'?' active':''}" data-tab="javi"
             style="font-weight:600;">JAVIER · CENTRO DE CONTROL</button>`;
+  html += `<button class="tab${curTab==='visualizacion'?' active':''}" data-tab="visualizacion"
+            style="font-weight:500;">RENDERS · VISUALIZACIÓN</button>`;
 
   // Separador
   html += `<div style="width:1px;background:var(--line);margin:4px 4px;align-self:stretch;opacity:.4;"></div>`;
@@ -685,8 +687,9 @@ function activateTab(id) {
   document.querySelectorAll('#tabs .tab').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === id));
 
-  if      (id === 'alejandra') renderAlejandra();
-  else if (id === 'javi')      renderJavi();
+  if      (id === 'alejandra')    renderAlejandra();
+  else if (id === 'javi')         renderJavi();
+  else if (id === 'visualizacion') renderVisualizacion();
   else if (id.startsWith('p__')) {
     const slug   = id.slice(3);
     // Buscar la persona cuyo slug coincida
@@ -778,7 +781,7 @@ function renderAlejandra() {
   // ── Bloque 4: RESUELTAS — JSON resueltas con decisión adoptada
   const sem = hoySemana();
   const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const VENTANA_HITOS = 21; // días
+  const VENTANA_HITOS = 14; // días
 
   // ── Datos del Excel ──────────────────────────────────────────
   const master = (typeof MASTER_DATA !== 'undefined') ? (MASTER_DATA || []) : [];
@@ -944,7 +947,46 @@ function renderAlejandra() {
     </div>`;
   }
 
-  // ── Bloque 2: Hitos próximos (≤21 días, Excel) ───────────────
+  // ── Bloque 1b: ATENCIÓN URGENTE — por estado del proyecto (sin sesión Ale requerida) ──
+  const proyUrgentes = (typeof ALE_URGENTE !== 'undefined' ? ALE_URGENTE : [])
+    .filter(p => p.nivel === 'ATENCIÓN MÁXIMA' || p.nivel === 'ATENCIÓN ALTA')
+    .sort((a, b) => {
+      if (a.nivel === 'ATENCIÓN MÁXIMA' && b.nivel !== 'ATENCIÓN MÁXIMA') return -1;
+      if (b.nivel === 'ATENCIÓN MÁXIMA' && a.nivel !== 'ATENCIÓN MÁXIMA') return 1;
+      return a.nombre.localeCompare(b.nombre);
+    });
+
+  if (proyUrgentes.length) {
+    html += `<div id="ale-urgente" class="panel" style="background:var(--bg2);border-left:3px solid #c06000;">
+      <div class="panel-head">
+        <span class="eyebrow" style="color:#c06000;">ATENCIÓN URGENTE</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${proyUrgentes.length} proyecto${proyUrgentes.length!==1?'s':''} · urgencia por estado, no por sesión</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:24%;">Proyecto</th>
+          <th style="width:14%;">Nivel</th>
+          <th style="width:46%;">Próximo hito / situación</th>
+          <th style="width:16%;">Fecha</th>
+        </tr></thead>
+        <tbody>${proyUrgentes.map(p => {
+          const esMax = p.nivel === 'ATENCIÓN MÁXIMA';
+          const nivelColor = esMax ? '#8b0000' : '#c06000';
+          const nivelIcon  = esMax ? '●' : '▲';
+          return `<tr style="border-top:1px solid var(--rule);">
+            <td style="padding:7px 4px 7px 0;font-size:12px;font-weight:500;vertical-align:top;">${p.nombre||'—'}<br>
+              <span style="font-size:10px;color:var(--ink3);font-weight:400;">${p.dept||''}</span></td>
+            <td style="padding:7px 4px;vertical-align:top;">
+              <span style="font-size:9px;font-weight:700;color:${nivelColor};text-transform:uppercase;letter-spacing:.5px;">${nivelIcon} ${p.nivel}</span></td>
+            <td style="padding:7px 4px;font-size:11.5px;color:var(--ink2);vertical-align:top;">${p.hito||'—'}${p.bloqueador && p.bloqueador !== '—' ? '<br><span style="font-size:10px;color:#8b0000;">⚠ ' + p.bloqueador + '</span>' : ''}</td>
+            <td style="padding:7px 0 7px 4px;font-size:11px;color:var(--ink3);vertical-align:top;">${_fmtMaster(p.fecha)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── Bloque 2: Hitos próximos (≤14 días, Excel) ───────────────
   if (hitosDedup.length) {
     function hitoDiasStr(dias) {
       if (dias === 0) return `<span style="color:#c00;font-weight:600;">hoy</span>`;
@@ -956,7 +998,7 @@ function renderAlejandra() {
     html += `<div id="ale-hitos" class="panel" style="background:var(--bg2);border-left:3px solid ${BORDE_PROX};">
       <div class="panel-head">
         <span class="eyebrow">HITOS PRÓXIMOS</span>
-        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">próximos 21 días · ${hitosDedup.length}</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">próximos 14 días · ${hitosDedup.length}</span>
       </div>
       <div class="tbl-wrap"><table class="tbl" style="width:100%;">
         <thead><tr>
@@ -1707,6 +1749,80 @@ function init() {
   // update-badge → fecha de modificación del Excel (estática, viene de META)
   const ub = document.getElementById('update-badge');
   if (ub && META?.updated) ub.textContent = 'Datos: ' + META.updated;
+}
+
+// ── RENDERS · VISUALIZACIÓN ──────────────────────────────────────────────────
+function renderVisualizacion() {
+  const el = document.getElementById('content');
+  if (!el) return;
+
+  const data = (typeof VISUALIZACION_DATA !== 'undefined') ? (VISUALIZACION_DATA || []) : [];
+
+  // Separar por colaborador (un proyecto puede aparecer en varias secciones)
+  function proysByColaborador(nombre) {
+    return data.filter(p => {
+      const v = (p.visualizacion || '').toLowerCase();
+      return v.includes(nombre.toLowerCase());
+    });
+  }
+
+  const challan = proysByColaborador('challan');
+  const pancho  = proysByColaborador('pancho');
+  const mauro   = proysByColaborador('mauro');
+
+  const totalUnico = data.length;
+
+  function renderSection(titulo, proyectos, color, icono) {
+    if (!proyectos.length) return `
+      <div class="panel" style="background:var(--bg2);border-left:3px solid ${color};opacity:.5;">
+        <div class="panel-head">
+          <span class="eyebrow" style="color:${color};">${icono} ${titulo}</span>
+          <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">sin proyectos asignados</span>
+        </div>
+      </div>`;
+
+    return `<div class="panel" style="background:var(--bg2);border-left:3px solid ${color};">
+      <div class="panel-head">
+        <span class="eyebrow" style="color:${color};">${icono} ${titulo}</span>
+        <span style="font-size:11px;color:var(--ink3);font-weight:300;margin-left:6px;">${proyectos.length} proyecto${proyectos.length!==1?'s':''}</span>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" style="width:100%;">
+        <thead><tr>
+          <th style="width:24%;">Proyecto</th>
+          <th style="width:14%;">Depto</th>
+          <th style="width:28%;">Visualización</th>
+          <th style="width:34%;">Próximo hito</th>
+        </tr></thead>
+        <tbody>${proyectos.map(p => `<tr style="border-top:1px solid var(--rule);">
+          <td style="padding:7px 4px 7px 0;font-size:12px;font-weight:500;vertical-align:top;">${p.nombre||'—'}</td>
+          <td style="padding:7px 4px;font-size:11px;color:var(--ink3);vertical-align:top;">${p.dept||'—'}</td>
+          <td style="padding:7px 4px;font-size:11.5px;vertical-align:top;">${p.visualizacion||'—'}</td>
+          <td style="padding:7px 0 7px 4px;font-size:11px;color:var(--ink2);vertical-align:top;">${p.hito||'—'}<br>
+            <span style="font-size:10px;color:var(--ink3);">${_fmtMaster(p.fecha)}</span></td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  let html = `<div class="view-head">
+    <div>
+      <div class="view-title">RENDERS · VISUALIZACIÓN</div>
+      <div class="view-sub">${totalUnico} proyecto${totalUnico!==1?'s':''} con visualización asignada · Challan ${challan.length} · Pancho ${pancho.length} · Mauro ${mauro.length}</div>
+    </div>
+  </div>`;
+
+  if (!totalUnico) {
+    html += `<div class="panel" style="background:var(--bg2);padding:24px;text-align:center;color:var(--ink3);font-size:13px;">
+      Ningún proyecto tiene visualización asignada en el Master.<br>
+      <span style="font-size:11px;">Rellena la columna VISUALIZACIÓN en el Excel para ver los proyectos aquí.</span>
+    </div>`;
+  } else {
+    html += renderSection('CHALLAN — Renders externos', challan, '#3a5a8b', '📐');
+    html += renderSection('PANCHO — Renders externos',  pancho,  '#5a3a8b', '📐');
+    html += renderSection('MAURO — 3D · IA · Renders',  mauro,   '#2a7a5a', '🖥');
+  }
+
+  el.innerHTML = html;
 }
 
 document.addEventListener('DOMContentLoaded', init);
